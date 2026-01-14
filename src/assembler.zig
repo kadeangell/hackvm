@@ -263,16 +263,16 @@ pub const Assembler = struct {
                 self.current_address +%= 2;
             },
 
-            // Rd, imm4 (shift immediate - imm is in Rs field)
+            // Rd, imm3 (shift immediate - imm is in Rs field, 3 bits only)
             .SHLI, .SHRI, .SARI => {
                 const rd = try self.parseRegister(lexer, mnemonic.line);
                 try self.expectToken(lexer, .comma, mnemonic.line);
                 const imm = try self.parseImmediate(lexer, mnemonic.line);
-                if (imm > 15 or imm < 0) {
-                    try self.addDiagnostic(mnemonic.line, 0, "Shift amount must be 0-15");
+                if (imm > 7 or imm < 0) {
+                    try self.addDiagnostic(mnemonic.line, 0, "Shift amount must be 0-7");
                     return error.NumberOutOfRange;
                 }
-                try self.output.append(self.allocator,regByte(rd, @truncate(@as(u8, @intCast(imm)))));
+                try self.output.append(self.allocator, regByte(rd, @truncate(@as(u8, @intCast(imm)))));
                 self.current_address +%= 1;
             },
 

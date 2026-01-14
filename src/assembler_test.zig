@@ -373,12 +373,13 @@ test "asm: SHLI R3, 4" {
     try expectBytes(&[_]u8{ 0x38, 0x70 }, output);
 }
 
-test "asm: SHRI R0, 8" {
+test "asm: SHRI R0, 4" {
     var asm_inst = Assembler.init(std.testing.allocator);
     defer asm_inst.deinit();
 
-    const output = try asm_inst.assemble("SHRI R0, 8");
-    try expectBytes(&[_]u8{ 0x3A, 0x20 }, output);
+    // SHRI opcode = 0x3A, regByte(R0=0, shift=4) = (0 << 5) | (4 << 2) = 0x10
+    const output = try asm_inst.assemble("SHRI R0, 4");
+    try expectBytes(&[_]u8{ 0x3A, 0x10 }, output);
 }
 
 // ============================================================================
@@ -970,4 +971,176 @@ test "asm: all single-register instructions" {
 
         try std.testing.expectEqual(instr.opcode, output[0]);
     }
+}
+
+// ============================================================================
+// Assembler - Stack Instructions
+// ============================================================================
+
+test "asm: PUSHF" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    const output = try asm_inst.assemble("PUSHF");
+    try expectBytes(&[_]u8{0x04}, output);
+}
+
+test "asm: POPF" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    const output = try asm_inst.assemble("POPF");
+    try expectBytes(&[_]u8{0x05}, output);
+}
+
+// ============================================================================
+// Assembler - Binary Numbers
+// ============================================================================
+
+test "asm: binary immediate" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    const output = try asm_inst.assemble("MOVI R0, 0b11110000");
+    try std.testing.expectEqual(@as(u8, 0xF0), output[2]);
+}
+
+test "asm: binary in ANDI" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    const output = try asm_inst.assemble("ANDI R0, 0b01111111");
+    try std.testing.expectEqual(@as(u8, 0x7F), output[2]);
+}
+
+// ============================================================================
+// Assembler - Multiple Instructions
+// ============================================================================
+
+test "asm: multiple instructions on separate lines" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    const source =
+        \\NOP
+        \\NOP
+        \\NOP
+        \\HALT
+    ;
+
+    const output = try asm_inst.assemble(source);
+    try expectBytes(&[_]u8{ 0x00, 0x00, 0x00, 0x01 }, output);
+}
+
+test "asm: empty lines are ignored" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    const source =
+        \\NOP
+        \\
+        \\HALT
+    ;
+
+    const output = try asm_inst.assemble(source);
+    try expectBytes(&[_]u8{ 0x00, 0x01 }, output);
+}
+
+test "asm: comment-only lines are ignored" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    const source =
+        \\; This is a comment
+        \\NOP
+        \\; Another comment
+        \\HALT
+    ;
+
+    const output = try asm_inst.assemble(source);
+    try expectBytes(&[_]u8{ 0x00, 0x01 }, output);
+}
+
+// ============================================================================
+// Assembler - Edge Cases
+// ============================================================================
+
+test "asm: zero immediate" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    const output = try asm_inst.assemble("MOVI R0, 0");
+    try std.testing.expectEqual(@as(u8, 0x00), output[2]);
+    try std.testing.expectEqual(@as(u8, 0x00), output[3]);
+}
+
+test "asm: max 16-bit immediate" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    const output = try asm_inst.assemble("MOVI R0, 65535");
+    try std.testing.expectEqual(@as(u8, 0xFF), output[2]);
+    try std.testing.expectEqual(@as(u8, 0xFF), output[3]);
+}
+
+test "asm: label at address 0" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    const source =
+        \\start:
+        \\    JMP start
+    ;
+
+    const output = try asm_inst.assemble(source);
+    try std.testing.expectEqual(@as(u8, 0x00), output[1]); // addr low = 0
+    try std.testing.expectEqual(@as(u8, 0x00), output[2]); // addr high = 0
+}
+
+test "asm: all registers in MOV" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    // Test all 8 registers as destination
+    for (0..8) |i| {
+        var buf: [32]u8 = undefined;
+        const source = std.fmt.bufPrint(&buf, "MOV R{d}, R0", .{i}) catch unreachable;
+
+        const output = asm_inst.assemble(source) catch |err| {
+            std.debug.print("Failed on R{d}: {}\n", .{ i, err });
+            return err;
+        };
+
+        const expected_reg_byte: u8 = @intCast(i << 5);
+        try std.testing.expectEqual(expected_reg_byte, output[1]);
+    }
+}
+
+test "asm: instruction sizes are correct" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    // 1-byte instructions
+    try std.testing.expectEqual(@as(usize, 1), (try asm_inst.assemble("NOP")).len);
+    try std.testing.expectEqual(@as(usize, 1), (try asm_inst.assemble("HALT")).len);
+    try std.testing.expectEqual(@as(usize, 1), (try asm_inst.assemble("DISPLAY")).len);
+    try std.testing.expectEqual(@as(usize, 1), (try asm_inst.assemble("RET")).len);
+    try std.testing.expectEqual(@as(usize, 1), (try asm_inst.assemble("PUSHF")).len);
+    try std.testing.expectEqual(@as(usize, 1), (try asm_inst.assemble("POPF")).len);
+    try std.testing.expectEqual(@as(usize, 1), (try asm_inst.assemble("MEMCPY")).len);
+    try std.testing.expectEqual(@as(usize, 1), (try asm_inst.assemble("MEMSET")).len);
+
+    // 2-byte instructions
+    try std.testing.expectEqual(@as(usize, 2), (try asm_inst.assemble("MOV R0, R1")).len);
+    try std.testing.expectEqual(@as(usize, 2), (try asm_inst.assemble("INC R0")).len);
+    try std.testing.expectEqual(@as(usize, 2), (try asm_inst.assemble("PUSH R0")).len);
+    try std.testing.expectEqual(@as(usize, 2), (try asm_inst.assemble("SHLI R0, 4")).len);
+
+    // 3-byte instructions
+    try std.testing.expectEqual(@as(usize, 3), (try asm_inst.assemble("ADDI R0, 1")).len);
+    try std.testing.expectEqual(@as(usize, 3), (try asm_inst.assemble("JMP 0x0000")).len);
+    try std.testing.expectEqual(@as(usize, 3), (try asm_inst.assemble("CALL 0x0000")).len);
+
+    // 4-byte instructions
+    try std.testing.expectEqual(@as(usize, 4), (try asm_inst.assemble("MOVI R0, 0")).len);
 }
