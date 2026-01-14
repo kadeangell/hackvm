@@ -12,53 +12,64 @@ A 16-bit virtual machine designed for hackathon competitions. Features a simple 
 - **System and countdown timers** for game timing
 - **MEMSET/MEMCPY** instructions for fast graphics operations
 
-## Building
+## Quick Start
 
 ### Prerequisites
 
 - [Zig](https://ziglang.org/) 0.13.0 or later
+- [Node.js](https://nodejs.org/) 18+ and npm
 - Python 3 (for generating test programs)
-- A web browser (for running the emulator)
 
-### Build WASM
+### Build & Run
 
 ```bash
+# Build WASM emulator
 zig build wasm
+
+# Generate test programs
+python3 tools/generate_tests.py
+
+# Install web dependencies and start dev server
+cd web
+npm install
+npm run dev
 ```
 
-This creates `web/hackvm.wasm`.
+Open http://localhost:3000 in your browser, load a `.bin` file from `examples/`, and click Run!
 
-### Build Native (for testing)
+### Production Build
 
 ```bash
-zig build
+cd web
+npm run build
 ```
 
-### Run Tests
+The production build will be in `web/dist/`.
 
-```bash
-zig build test
+## Project Structure
+
 ```
-
-## Running the Emulator
-
-1. Build the WASM binary: `zig build wasm`
-2. Generate test programs: `python3 tools/generate_tests.py`
-3. Start a local web server in the project directory:
-   ```bash
-   python3 -m http.server 8000
-   ```
-4. Open http://localhost:8000/web/ in your browser
-5. Click "Load Program" and select a `.bin` file from the `examples/` directory
-6. Click "Run" to start execution
-
-### Keyboard Controls
-
-- **Arrow keys**: Movement (keycodes 0x80-0x83)
-- **A-Z**: Letters (keycodes 0x41-0x5A)
-- **0-9**: Digits (keycodes 0x30-0x39)
-- **Space, Enter, Escape**: Common keys
-- Click on the screen canvas to focus before using keyboard
+hackvm/
+├── src/                    # Zig emulator source
+│   ├── main.zig           # WASM entry point
+│   ├── native_main.zig    # CLI for testing
+│   ├── cpu.zig            # CPU implementation
+│   ├── memory.zig         # Memory system
+│   └── opcodes.zig        # Opcode definitions
+├── web/                    # React frontend
+│   ├── src/
+│   │   ├── components/    # React components
+│   │   ├── hooks/         # Custom hooks
+│   │   ├── App.tsx        # Main app
+│   │   └── types.ts       # TypeScript types
+│   ├── public/
+│   │   └── hackvm.wasm    # Built WASM binary
+│   └── package.json
+├── tools/
+│   └── generate_tests.py  # Test program generator
+├── examples/              # Example .bin programs
+└── build.zig              # Zig build config
+```
 
 ## Example Programs
 
@@ -143,25 +154,11 @@ Until we have an assembler, you can:
     HALT                     ; Stop
 ```
 
-## Project Structure
+## Tech Stack
 
-```
-hackvm/
-├── src/
-│   ├── main.zig         # WASM entry point
-│   ├── native_main.zig  # Native CLI entry point
-│   ├── cpu.zig          # CPU implementation
-│   ├── memory.zig       # Memory system
-│   └── opcodes.zig      # Opcode definitions
-├── web/
-│   ├── index.html       # Emulator UI
-│   ├── emulator.js      # JavaScript host
-│   └── hackvm.wasm      # Built WASM binary
-├── tools/
-│   └── generate_tests.py # Test program generator
-├── examples/            # Example .bin programs
-└── build.zig            # Build configuration
-```
+- **Emulator**: Zig → WebAssembly
+- **Frontend**: React + TypeScript + Tailwind CSS + Vite
+- **Icons**: Lucide React
 
 ## License
 

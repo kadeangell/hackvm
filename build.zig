@@ -35,8 +35,9 @@ pub fn build(b: *std.Build) void {
         "getFlags",
     };
 
+    // Install to web/public for Vite
     const install_wasm = b.addInstallArtifact(wasm, .{
-        .dest_dir = .{ .override = .{ .custom = "../web" } },
+        .dest_dir = .{ .override = .{ .custom = "../web/public" } },
     });
 
     const wasm_step = b.step("wasm", "Build WASM binary");

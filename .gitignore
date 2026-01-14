@@ -4,12 +4,8 @@ zig-cache/
 .zig-cache/
 
 # Build artifacts
-*.wasm
 *.o
 *.a
-
-# But keep the web directory's wasm file tracked after build
-!web/hackvm.wasm
 
 # Example binaries (generated)
 examples/*.bin
@@ -27,3 +23,11 @@ Thumbs.db
 # Python
 __pycache__/
 *.pyc
+
+# Node.js / Vite
+web/node_modules/
+web/dist/
+web/.vite/
+
+# Keep WASM in public
+!web/public/hackvm.wasm
