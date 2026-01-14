@@ -1,6 +1,6 @@
 # HackVM
 
-A 16-bit virtual machine designed for hackathon competitions. Features a simple instruction set, 128x128 pixel graphics with 8-bit color, keyboard input, and timer support.
+A 16-bit virtual machine designed for hackathon competitions. Features a simple instruction set, 128x128 pixel graphics with 8-bit color, keyboard input, and timer support. Includes a built-in assembler.
 
 ## Features
 
@@ -11,6 +11,7 @@ A 16-bit virtual machine designed for hackathon competitions. Features a simple 
 - **Keyboard input** for interactive programs
 - **System and countdown timers** for game timing
 - **MEMSET/MEMCPY** instructions for fast graphics operations
+- **Built-in assembler** - write and run assembly in the browser!
 
 ## Quick Start
 
@@ -18,16 +19,12 @@ A 16-bit virtual machine designed for hackathon competitions. Features a simple 
 
 - [Zig](https://ziglang.org/) 0.13.0 or later
 - [Node.js](https://nodejs.org/) 18+ and npm
-- Python 3 (for generating test programs)
 
 ### Build & Run
 
 ```bash
-# Build WASM emulator
+# Build both WASM binaries (emulator + assembler)
 zig build wasm
-
-# Generate test programs
-python3 tools/generate_tests.py
 
 # Install web dependencies and start dev server
 cd web
@@ -35,59 +32,64 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000 in your browser, load a `.bin` file from `examples/`, and click Run!
+Open http://localhost:3000 in your browser. Write assembly code in the editor and click "Assemble & Run"!
 
-### Production Build
+### Native CLI
+
+The native binary supports both running programs and assembling source files:
 
 ```bash
-cd web
-npm run build
-```
+# Build native CLI
+zig build
 
-The production build will be in `web/dist/`.
+# Assemble a source file
+./zig-out/bin/hackvm asm examples/fill_red.asm -o fill_red.bin
+
+# Run a binary program
+./zig-out/bin/hackvm run fill_red.bin
+
+# Run with debug output
+./zig-out/bin/hackvm run fill_red.bin --debug
+```
 
 ## Project Structure
 
 ```
 hackvm/
-├── src/                    # Zig emulator source
-│   ├── main.zig           # WASM entry point
-│   ├── native_main.zig    # CLI for testing
+├── src/                    # Zig source code
+│   ├── main.zig           # Emulator WASM entry point
+│   ├── asm_main.zig       # Assembler WASM entry point
+│   ├── native_main.zig    # Native CLI (unified)
 │   ├── cpu.zig            # CPU implementation
 │   ├── memory.zig         # Memory system
-│   └── opcodes.zig        # Opcode definitions
+│   ├── opcodes.zig        # Opcode definitions
+│   ├── assembler.zig      # Assembler core
+│   └── lexer.zig          # Assembly lexer
 ├── web/                    # React frontend
 │   ├── src/
 │   │   ├── components/    # React components
-│   │   ├── hooks/         # Custom hooks
-│   │   ├── App.tsx        # Main app
-│   │   └── types.ts       # TypeScript types
-│   ├── public/
-│   │   └── hackvm.wasm    # Built WASM binary
-│   └── package.json
-├── tools/
-│   └── generate_tests.py  # Test program generator
-├── examples/              # Example .bin programs
-└── build.zig              # Zig build config
+│   │   ├── hooks/         # useEmulator, useAssembler
+│   │   └── App.tsx        # Main app with editor
+│   └── public/
+│       ├── hackvm.wasm    # Emulator WASM
+│       └── hackvm-asm.wasm # Assembler WASM
+├── examples/              # Example .asm files
+└── build.zig
 ```
 
-## Example Programs
+## Assembly Language
 
-Generate the example programs with:
+### Syntax
 
-```bash
-python3 tools/generate_tests.py
+```asm
+; This is a comment
+.equ    CONSTANT, 0x4000    ; Define constant
+.org    0x0000              ; Set origin address
+
+label:
+    MOVI    R0, 0x1234      ; Instruction
+    JMP     label           ; Jump to label
 ```
-
-| Program | Description |
-|---------|-------------|
-| `fill_red.bin` | Fills the screen with red |
-| `gradient.bin` | Displays a color gradient |
-| `color_cycle.bin` | Animates through all 256 colors |
-| `keyboard_test.bin` | Changes screen color based on key pressed |
-| `moving_pixel.bin` | Move a white pixel with arrow keys |
-
-## Architecture Overview
 
 ### Registers
 
@@ -95,81 +97,108 @@ python3 tools/generate_tests.py
 |----------|-------------|
 | R0-R7 | General purpose (16-bit) |
 | PC | Program Counter |
-| SP | Stack Pointer (initialized to 0xFFEF) |
-| FLAGS | Z (Zero), C (Carry), N (Negative), V (Overflow) |
+| SP | Stack Pointer (init: 0xFFEF) |
+| FLAGS | Z, C, N, V |
+
+### Instructions
+
+| Category | Instructions |
+|----------|--------------|
+| Data | MOV, MOVI, LOAD, LOADB, STORE, STOREB, PUSH, POP |
+| Arithmetic | ADD, ADDI, SUB, SUBI, MUL, DIV, INC, DEC, NEG |
+| Logical | AND, ANDI, OR, ORI, XOR, XORI, NOT, SHL, SHR, SAR |
+| Compare | CMP, CMPI, TEST, TESTI |
+| Control | JMP, JZ, JNZ, JC, JNC, JN, JA, JG, JL, CALL, RET |
+| Memory | MEMSET, MEMCPY |
+| System | DISPLAY, HALT, NOP |
+
+### Directives
+
+| Directive | Description |
+|-----------|-------------|
+| `.equ name, value` | Define constant |
+| `.org address` | Set assembly address |
+| `.db val, ...` | Define bytes |
+| `.dw val, ...` | Define words (16-bit) |
+| `.ds count` | Reserve space |
 
 ### Memory Map
 
-| Address Range | Description |
-|---------------|-------------|
-| 0x0000-0x3FFF | Program memory (16KB) |
-| 0x4000-0x7FFF | Framebuffer (128x128 pixels) |
-| 0x8000-0xFFEF | General RAM |
-| 0xFFF0-0xFFF1 | System timer (read-only) |
-| 0xFFF2-0xFFF3 | Countdown timer (read/write) |
-| 0xFFF4 | Keyboard keycode (read-only) |
-| 0xFFF5 | Keyboard state (read-only) |
+| Address | Description |
+|---------|-------------|
+| 0x0000-0x3FFF | Program (16KB) |
+| 0x4000-0x7FFF | Framebuffer (128x128) |
+| 0x8000-0xFFEF | RAM |
+| 0xFFF0-0xFFF1 | System Timer |
+| 0xFFF2-0xFFF3 | Countdown Timer |
+| 0xFFF4 | Key Code |
+| 0xFFF5 | Key State |
 
-### Color Format (RGB332)
+### Colors (RGB332)
 
-Each pixel is one byte: `RRRGGGBB`
-
-| Color | Hex Value |
-|-------|-----------|
+| Color | Value |
+|-------|-------|
 | Black | 0x00 |
 | White | 0xFF |
 | Red | 0xE0 |
 | Green | 0x1C |
 | Blue | 0x03 |
 
-### Key Instructions
+### Key Codes
 
-| Instruction | Description | Cycles |
-|-------------|-------------|--------|
-| `MOVI Rd, imm16` | Load 16-bit immediate | 3 |
-| `LOAD Rd, [Rs]` | Load 16-bit from memory | 4 |
-| `STOREB [Rd], Rs` | Store byte to memory | 3 |
-| `MEMSET` | Fill R2 bytes at [R0] with R1 | 5+N |
-| `MEMCPY` | Copy R2 bytes from [R0] to [R1] | 5+N |
-| `DISPLAY` | Render framebuffer | 1000 |
-| `JNZ addr` | Jump if not zero | 2/4 |
+| Key | Code |
+|-----|------|
+| Arrow Up | 0x80 |
+| Arrow Down | 0x81 |
+| Arrow Left | 0x82 |
+| Arrow Right | 0x83 |
+| A-Z | 0x41-0x5A |
+| 0-9 | 0x30-0x39 |
+| Space | 0x20 |
 
-## Writing Programs
-
-Until we have an assembler, you can:
-
-1. **Hand-assemble** using the Python script as a reference
-2. **Modify `tools/generate_tests.py`** to create new programs
-3. **Write a compiler** that targets this instruction set (bonus points!)
-
-### Assembly Example
+## Example Program
 
 ```asm
-; Fill screen with red
-    MOVI    R0, 0x4000      ; Framebuffer address
-    MOVI    R1, 0xE0        ; Red color
-    MOVI    R2, 16384       ; Screen size in bytes
-    MEMSET                   ; Fill memory
-    DISPLAY                  ; Show on screen
-    HALT                     ; Stop
+; Fill screen with animated colors
+
+.equ    FRAMEBUFFER, 0x4000
+.equ    SCREEN_SIZE, 16384
+
+.org    0x0000
+
+    MOVI    R7, 0           ; Color counter
+
+loop:
+    ; Fill screen
+    MOVI    R0, FRAMEBUFFER
+    MOV     R1, R7
+    MOVI    R2, SCREEN_SIZE
+    MEMSET
+    
+    ; Show frame
+    DISPLAY
+    
+    ; Next color
+    INC     R7
+    JMP     loop
+```
+
+## Build Targets
+
+```bash
+zig build wasm      # Build both WASM files
+zig build           # Build native CLI
+zig build test      # Run all tests
+zig build run -- asm file.asm   # Assemble file
+zig build run -- run file.bin   # Run program
 ```
 
 ## Tech Stack
 
-- **Emulator**: Zig → WebAssembly
+- **Emulator & Assembler**: Zig → WebAssembly
 - **Frontend**: React + TypeScript + Tailwind CSS + Vite
 - **Icons**: Lucide React
 
 ## License
 
 MIT
-
-## Contributing
-
-This is a hackathon project! Feel free to:
-
-- Add new example programs
-- Build an assembler
-- Build a compiler targeting this VM
-- Add sound support
-- Improve the web UI
