@@ -1,0 +1,29 @@
+# Zig
+zig-out/
+zig-cache/
+.zig-cache/
+
+# Build artifacts
+*.wasm
+*.o
+*.a
+
+# But keep the web directory's wasm file tracked after build
+!web/hackvm.wasm
+
+# Example binaries (generated)
+examples/*.bin
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc

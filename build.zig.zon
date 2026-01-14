@@ -1,0 +1,11 @@
+.{
+    .fingerprint = 0xd640cdd03728b301,
+    .name = .hackvm,
+    .version = "0.1.0",
+    .minimum_zig_version = "0.15.2",
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}

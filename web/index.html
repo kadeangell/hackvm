@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HackVM Emulator</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #00ff88;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+        }
+
+        .screen-section {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 20px;
+            border: 2px solid #0f3460;
+        }
+
+        .screen-container {
+            background: #000;
+            padding: 10px;
+            border-radius: 5px;
+            display: inline-block;
+        }
+
+        #screen {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            border: 2px solid #333;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: #0f3460;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #1a5490;
+        }
+
+        button:disabled {
+            background: #333;
+            cursor: not-allowed;
+        }
+
+        button.running {
+            background: #e94560;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .panel {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 15px;
+            border: 2px solid #0f3460;
+        }
+
+        .panel h3 {
+            margin: 0 0 10px 0;
+            color: #00ff88;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .registers {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .register {
+            background: #0a0a1a;
+            padding: 5px 8px;
+            border-radius: 3px;
+        }
+
+        .register-name {
+            color: #888;
+        }
+
+        .register-value {
+            color: #00ff88;
+            float: right;
+        }
+
+        .stats {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            border-bottom: 1px solid #0f3460;
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            color: #888;
+        }
+
+        .stat-value {
+            color: #00ff88;
+        }
+
+        .flags {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+        }
+
+        .flag {
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0a0a1a;
+            border-radius: 5px;
+            color: #444;
+        }
+
+        .flag.active {
+            color: #00ff88;
+            background: #0f3460;
+            box-shadow: 0 0 5px rgba(0, 255, 136, 0.3);
+        }
+
+        .status {
+            text-align: center;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .status.ready {
+            background: #1a5490;
+        }
+
+        .status.running {
+            background: #00aa55;
+        }
+
+        .status.halted {
+            background: #e94560;
+        }
+
+        .keyboard-hint {
+            font-size: 11px;
+            color: #666;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .speed-control label {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .speed-control select {
+            background: #0a0a1a;
+            color: #fff;
+            border: 1px solid #0f3460;
+            padding: 5px;
+            border-radius: 3px;
+        }
+
+        @media (max-width: 900px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ HackVM Emulator</h1>
+        
+        <div class="main-layout">
+            <div class="screen-section">
+                <div class="screen-container">
+                    <canvas id="screen" width="128" height="128"></canvas>
+                </div>
+                
+                <div class="controls">
+                    <div class="file-input-wrapper">
+                        <button id="loadBtn">📁 Load Program</button>
+                        <input type="file" id="fileInput" accept=".bin,.hvm">
+                    </div>
+                    <button id="runBtn" disabled>▶ Run</button>
+                    <button id="pauseBtn" disabled>⏸ Pause</button>
+                    <button id="stepBtn" disabled>⏭ Step</button>
+                    <button id="resetBtn" disabled>🔄 Reset</button>
+                </div>
+
+                <div class="speed-control">
+                    <label>Speed:</label>
+                    <select id="speedSelect">
+                        <option value="0.25">0.25x (1 MHz)</option>
+                        <option value="0.5">0.5x (2 MHz)</option>
+                        <option value="1" selected>1x (4 MHz)</option>
+                        <option value="2">2x (8 MHz)</option>
+                        <option value="4">4x (16 MHz)</option>
+                        <option value="0">Unlimited</option>
+                    </select>
+                </div>
+
+                <div class="keyboard-hint">
+                    Click on the screen to focus, then use arrow keys and other keys for input.
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="panel">
+                    <h3>Status</h3>
+                    <div id="status" class="status ready">Ready - Load a program</div>
+                </div>
+
+                <div class="panel">
+                    <h3>Registers</h3>
+                    <div class="registers">
+                        <div class="register"><span class="register-name">R0</span><span class="register-value" id="r0">0000</span></div>
+                        <div class="register"><span class="register-name">R1</span><span class="register-value" id="r1">0000</span></div>
+                        <div class="register"><span class="register-name">R2</span><span class="register-value" id="r2">0000</span></div>
+                        <div class="register"><span class="register-name">R3</span><span class="register-value" id="r3">0000</span></div>
+                        <div class="register"><span class="register-name">R4</span><span class="register-value" id="r4">0000</span></div>
+                        <div class="register"><span class="register-name">R5</span><span class="register-value" id="r5">0000</span></div>
+                        <div class="register"><span class="register-name">R6</span><span class="register-value" id="r6">0000</span></div>
+                        <div class="register"><span class="register-name">R7</span><span class="register-value" id="r7">0000</span></div>
+                        <div class="register"><span class="register-name">PC</span><span class="register-value" id="pc">0000</span></div>
+                        <div class="register"><span class="register-name">SP</span><span class="register-value" id="sp">FFEF</span></div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3>Flags</h3>
+                    <div class="flags">
+                        <div class="flag" id="flag-z" title="Zero">Z</div>
+                        <div class="flag" id="flag-c" title="Carry">C</div>
+                        <div class="flag" id="flag-n" title="Negative">N</div>
+                        <div class="flag" id="flag-v" title="Overflow">V</div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3>Statistics</h3>
+                    <div class="stats">
+                        <div class="stat-row">
+                            <span class="stat-label">Cycles</span>
+                            <span class="stat-value" id="cycles">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">FPS</span>
+                            <span class="stat-value" id="fps">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">MHz (actual)</span>
+                            <span class="stat-value" id="mhz">0.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="emulator.js"></script>
+</body>
+</html>
