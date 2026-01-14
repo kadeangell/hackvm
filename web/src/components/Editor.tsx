@@ -1,8 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Play, AlertCircle, CheckCircle, Code } from 'lucide-react';
-import MonacoEditor, { OnMount, BeforeMount } from '@monaco-editor/react';
+import MonacoEditor, { OnMount, BeforeMount, Monaco } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
-// @ts-expect-error - monaco-vim doesn't have types
 import { initVimMode } from 'monaco-vim';
 
 interface EditorProps {
@@ -32,12 +31,12 @@ start:
 `;
 
 // Register HackVM assembly language for Monaco
-const registerHackVMLanguage: BeforeMount = (monaco) => {
+const registerHackVMLanguage: BeforeMount = (monacoInstance: Monaco) => {
   // Register the language
-  monaco.languages.register({ id: 'hackvm-asm' });
+  monacoInstance.languages.register({ id: 'hackvm-asm' });
 
   // Define tokens for syntax highlighting
-  monaco.languages.setMonarchTokensProvider('hackvm-asm', {
+  monacoInstance.languages.setMonarchTokensProvider('hackvm-asm', {
     ignoreCase: true,
 
     keywords: [
@@ -105,7 +104,7 @@ const registerHackVMLanguage: BeforeMount = (monaco) => {
   });
 
   // Define editor theme matching HackVM colors
-  monaco.editor.defineTheme('hackvm-dark', {
+  monacoInstance.editor.defineTheme('hackvm-dark', {
     base: 'vs-dark',
     inherit: true,
     rules: [
@@ -133,7 +132,7 @@ const registerHackVMLanguage: BeforeMount = (monaco) => {
   });
 
   // Register completion provider
-  monaco.languages.registerCompletionItemProvider('hackvm-asm', {
+  monacoInstance.languages.registerCompletionItemProvider('hackvm-asm', {
     provideCompletionItems: (model, position) => {
       const word = model.getWordUntilPosition(position);
       const range = {
@@ -161,19 +160,19 @@ const registerHackVMLanguage: BeforeMount = (monaco) => {
       const suggestions = [
         ...instructions.map(instr => ({
           label: instr,
-          kind: monaco.languages.CompletionItemKind.Keyword,
+          kind: monacoInstance.languages.CompletionItemKind.Keyword,
           insertText: instr,
           range
         })),
         ...directives.map(dir => ({
           label: dir,
-          kind: monaco.languages.CompletionItemKind.Keyword,
-          insertText: dir.substring(1), // Remove leading dot for insertion after .
+          kind: monacoInstance.languages.CompletionItemKind.Keyword,
+          insertText: dir.substring(1),
           range
         })),
         ...registers.map(reg => ({
           label: reg,
-          kind: monaco.languages.CompletionItemKind.Variable,
+          kind: monacoInstance.languages.CompletionItemKind.Variable,
           insertText: reg,
           range
         }))
@@ -194,8 +193,8 @@ export function Editor({ onAssembled, assemble, assemblerLoaded }: EditorProps) 
   const vimModeRef = useRef<{ dispose: () => void } | null>(null);
   const statusBarRef = useRef<HTMLDivElement | null>(null);
 
-  const handleEditorMount: OnMount = (editor) => {
-    editorRef.current = editor;
+  const handleEditorMount: OnMount = (editorInstance) => {
+    editorRef.current = editorInstance;
   };
 
   // Handle vim mode toggle
