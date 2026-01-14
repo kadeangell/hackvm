@@ -275,6 +275,7 @@ export function useEmulator() {
     step,
     reset,
     loadFile,
+    loadProgram,
     handleKeyDown,
     handleKeyUp,
   };
