@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
-import { Zap, Monitor, Code, BookOpen } from 'lucide-react';
+import { Zap, Monitor, Code, BookOpen, Github } from 'lucide-react';
 import { useEmulator } from './hooks/useEmulator';
 import { useAssembler } from './hooks/useAssembler';
 import { Card, CardHeader, CardTitle, CardContent } from './components/ui/card';
@@ -286,6 +286,18 @@ export default function App() {
           />
           <Route path="/docs" element={<Docs />} />
         </Routes>
+
+        <footer className="mt-12 py-6 border-t border-hvm-border text-center">
+          <a
+            href="https://github.com/kadeangell/hackvm"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-gray-400 hover:text-hvm-accent transition-colors"
+          >
+            <Github size={20} />
+            <span className="text-sm">View on GitHub</span>
+          </a>
+        </footer>
       </div>
     </div>
   );

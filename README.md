@@ -2,6 +2,8 @@
 
 A 16-bit virtual machine designed for hackathon competitions. Features a simple instruction set, 128x128 pixel graphics with 8-bit color, keyboard input, and timer support. Includes a built-in assembler.
 
+**[Try it live at hackvm.ka.de.com](https://hackvm.ka.de.com)**
+
 ## Features
 
 - **16-bit architecture** with 8 general-purpose registers
@@ -9,6 +11,7 @@ A 16-bit virtual machine designed for hackathon competitions. Features a simple 
 - **128x128 display** with RGB332 color (256 colors)
 - **4 MHz clock speed** with cycle-accurate emulation
 - **Keyboard input** for interactive programs
+- **Console I/O** - text output (PUTC, PUTS, PUTI, PUTX) and input (GETC, GETS, KBHIT)
 - **System and countdown timers** for game timing
 - **MEMSET/MEMCPY** instructions for fast graphics operations
 - **Built-in assembler** - write and run assembly in the browser!
@@ -32,7 +35,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000 in your browser. Write assembly code in the editor and click "Assemble & Run"!
+Open http://localhost:4000 in your browser. Write assembly code in the editor and click "Assemble & Run"
 
 ### Native CLI
 
@@ -110,6 +113,8 @@ label:
 | Compare | CMP, CMPI, TEST, TESTI |
 | Control | JMP, JZ, JNZ, JC, JNC, JN, JA, JG, JL, CALL, RET |
 | Memory | MEMSET, MEMCPY |
+| Console Output | PUTC, PUTS, PUTI, PUTX |
+| Console Input | GETC, GETS, KBHIT |
 | System | DISPLAY, HALT, NOP |
 
 ### Directives
