@@ -3,6 +3,7 @@ import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom'
 import { Zap, Monitor, Code, BookOpen } from 'lucide-react';
 import { useEmulator } from './hooks/useEmulator';
 import { useAssembler } from './hooks/useAssembler';
+import { Card, CardHeader, CardTitle, CardContent } from './components/ui/card';
 import {
   Screen,
   Controls,
@@ -34,44 +35,50 @@ function EditorPage({
         />
       </div>
       <div className="space-y-4">
-        <div className="bg-hvm-panel rounded-xl p-4 border-2 border-hvm-border">
-          <h3 className="text-hvm-accent text-sm font-semibold uppercase tracking-wider mb-3">
-            Quick Reference
-          </h3>
-          <div className="text-xs text-gray-400 space-y-2 font-mono">
-            <p><span className="text-hvm-accent">Registers:</span> R0-R7</p>
-            <p><span className="text-hvm-accent">Data:</span> MOV, MOVI, LOAD, STORE</p>
-            <p><span className="text-hvm-accent">Math:</span> ADD, SUB, MUL, DIV, INC, DEC</p>
-            <p><span className="text-hvm-accent">Logic:</span> AND, OR, XOR, NOT, SHL, SHR</p>
-            <p><span className="text-hvm-accent">Control:</span> JMP, JZ, JNZ, CALL, RET</p>
-            <p><span className="text-hvm-accent">Memory:</span> MEMSET, MEMCPY</p>
-            <p><span className="text-hvm-accent">System:</span> DISPLAY, HALT</p>
-          </div>
-        </div>
-        <div className="bg-hvm-panel rounded-xl p-4 border-2 border-hvm-border">
-          <h3 className="text-hvm-accent text-sm font-semibold uppercase tracking-wider mb-3">
-            Directives
-          </h3>
-          <div className="text-xs text-gray-400 space-y-1 font-mono">
-            <p>.equ NAME, value</p>
-            <p>.org address</p>
-            <p>.db byte, byte, ...</p>
-            <p>.dw word, word, ...</p>
-            <p>.ds count</p>
-          </div>
-        </div>
-        <div className="bg-hvm-panel rounded-xl p-4 border-2 border-hvm-border">
-          <h3 className="text-hvm-accent text-sm font-semibold uppercase tracking-wider mb-3">
-            Memory Map
-          </h3>
-          <div className="text-xs text-gray-400 space-y-1 font-mono">
-            <p>0x0000 - Program</p>
-            <p>0x4000 - Framebuffer</p>
-            <p>0x8000 - RAM</p>
-            <p>0xFFF0 - Timer</p>
-            <p>0xFFF4 - Keyboard</p>
-          </div>
-        </div>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm uppercase tracking-wider">Quick Reference</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-xs text-gray-400 space-y-2 font-mono">
+              <p><span className="text-hvm-accent">Registers:</span> R0-R7</p>
+              <p><span className="text-hvm-accent">Data:</span> MOV, MOVI, LOAD, STORE</p>
+              <p><span className="text-hvm-accent">Math:</span> ADD, SUB, MUL, DIV, INC, DEC</p>
+              <p><span className="text-hvm-accent">Logic:</span> AND, OR, XOR, NOT, SHL, SHR</p>
+              <p><span className="text-hvm-accent">Control:</span> JMP, JZ, JNZ, CALL, RET</p>
+              <p><span className="text-hvm-accent">Memory:</span> MEMSET, MEMCPY</p>
+              <p><span className="text-hvm-accent">System:</span> DISPLAY, HALT</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm uppercase tracking-wider">Directives</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-xs text-gray-400 space-y-1 font-mono">
+              <p>.equ NAME, value</p>
+              <p>.org address</p>
+              <p>.db byte, byte, ...</p>
+              <p>.dw word, word, ...</p>
+              <p>.ds count</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm uppercase tracking-wider">Memory Map</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-xs text-gray-400 space-y-1 font-mono">
+              <p>0x0000 - Program</p>
+              <p>0x4000 - Framebuffer</p>
+              <p>0x8000 - RAM</p>
+              <p>0xFFF0 - Timer</p>
+              <p>0xFFF4 - Keyboard</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
@@ -117,7 +124,7 @@ function EmulatorPage({
 }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-5">
-      <div className="bg-hvm-panel rounded-xl p-5 border-2 border-hvm-border">
+      <Card className="p-5">
         <Screen
           onInit={initCanvas}
           onKeyDown={handleKeyDown}
@@ -143,7 +150,7 @@ function EmulatorPage({
         <p className="text-xs text-gray-500 text-center mt-4">
           Click on the screen to focus, then use arrow keys for input.
         </p>
-      </div>
+      </Card>
 
       <div className="flex flex-col gap-4">
         <Status

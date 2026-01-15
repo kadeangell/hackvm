@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { Play, Pause, SkipForward, RotateCcw, FolderOpen } from 'lucide-react';
+import { Button } from './ui/button';
 
 interface ControlsProps {
   running: boolean;
@@ -28,24 +29,20 @@ export function Controls({
     const file = e.target.files?.[0];
     if (file) {
       onLoadFile(file);
-      e.target.value = ''; // Reset input
+      e.target.value = '';
     }
   };
-
-  const buttonBase = "flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed";
-  const primaryButton = `${buttonBase} bg-hvm-border hover:bg-hvm-accent-dim text-white`;
-  const runningButton = `${buttonBase} bg-hvm-danger text-white`;
 
   return (
     <div className="flex flex-wrap gap-3 mt-5">
       <div className="relative">
-        <button
-          className={primaryButton}
+        <Button
+          variant="secondary"
           onClick={() => fileInputRef.current?.click()}
         >
           <FolderOpen size={18} />
           Load Program
-        </button>
+        </Button>
         <input
           ref={fileInputRef}
           type="file"
@@ -55,32 +52,32 @@ export function Controls({
         />
       </div>
 
-      <button
-        className={running ? runningButton : primaryButton}
+      <Button
+        variant={running ? 'destructive' : 'secondary'}
         onClick={running ? onPause : onStart}
         disabled={!programLoaded || halted}
       >
         {running ? <Pause size={18} /> : <Play size={18} />}
         {running ? 'Pause' : 'Run'}
-      </button>
+      </Button>
 
-      <button
-        className={primaryButton}
+      <Button
+        variant="secondary"
         onClick={onStep}
         disabled={!programLoaded || running || halted}
       >
         <SkipForward size={18} />
         Step
-      </button>
+      </Button>
 
-      <button
-        className={primaryButton}
+      <Button
+        variant="secondary"
         onClick={onReset}
         disabled={!programLoaded}
       >
         <RotateCcw size={18} />
         Reset
-      </button>
+      </Button>
     </div>
   );
 }

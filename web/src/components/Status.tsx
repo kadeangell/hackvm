@@ -1,3 +1,6 @@
+import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
+import { Badge } from './ui/badge';
+
 interface StatusProps {
   running: boolean;
   halted: boolean;
@@ -7,33 +10,35 @@ interface StatusProps {
 
 export function Status({ running, halted, programLoaded, wasmLoaded }: StatusProps) {
   let text: string;
-  let colorClass: string;
+  let variant: 'default' | 'secondary' | 'destructive' | 'success';
 
   if (!wasmLoaded) {
     text = 'Loading emulator...';
-    colorClass = 'bg-gray-600';
+    variant = 'secondary';
   } else if (halted) {
     text = 'Halted';
-    colorClass = 'bg-hvm-danger';
+    variant = 'destructive';
   } else if (running) {
     text = 'Running';
-    colorClass = 'bg-hvm-accent-dim';
+    variant = 'success';
   } else if (programLoaded) {
     text = 'Program loaded - Press Run';
-    colorClass = 'bg-blue-600';
+    variant = 'default';
   } else {
     text = 'Ready - Load a program';
-    colorClass = 'bg-blue-600';
+    variant = 'default';
   }
 
   return (
-    <div className="bg-hvm-panel rounded-xl p-4 border-2 border-hvm-border">
-      <h3 className="text-hvm-accent text-sm font-semibold uppercase tracking-wider mb-3">
-        Status
-      </h3>
-      <div className={`${colorClass} text-center py-2 px-4 rounded-lg font-semibold`}>
-        {text}
-      </div>
-    </div>
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm uppercase tracking-wider">Status</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Badge variant={variant} className="w-full justify-center py-2 text-sm">
+          {text}
+        </Badge>
+      </CardContent>
+    </Card>
   );
 }
