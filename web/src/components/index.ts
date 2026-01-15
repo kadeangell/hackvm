@@ -6,3 +6,4 @@ export { Flags } from './Flags';
 export { Stats } from './Stats';
 export { Status } from './Status';
 export { Editor } from './Editor';
+export { Docs } from './Docs';
