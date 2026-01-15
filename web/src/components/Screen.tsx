@@ -39,14 +39,14 @@ export const Screen = forwardRef<HTMLCanvasElement, ScreenProps>(
     }, [onKeyDown, onKeyUp]);
 
     return (
-      <div className="bg-black p-3 rounded-lg inline-block">
+      <div className="bg-black p-3 rounded-lg w-full max-w-[512px]">
         <canvas
           ref={canvasRef}
           width={128}
           height={128}
           tabIndex={0}
-          className="block border-2 border-gray-700 focus:border-hvm-accent focus:outline-none cursor-pointer"
-          style={{ width: '512px', height: '512px' }}
+          className="block w-full aspect-square border-2 border-gray-700 focus:border-hvm-accent focus:outline-none cursor-pointer"
+          style={{ imageRendering: 'pixelated' }}
           onClick={(e) => (e.target as HTMLCanvasElement).focus()}
         />
       </div>
