@@ -1,6 +1,6 @@
 # HackVM: Instruction Set Architecture & System Design Specification
 
-**Version:** 1.2  
+**Version:** 1.3  
 **Target:** Hackathon Competition Platform
 
 ---
@@ -35,7 +35,7 @@ HackVM is a 16-bit virtual machine designed for hackathon competitions. It featu
 - Powerful enough to create games, demos, and interactive applications
 - Simple instruction encoding that can be hand-assembled if needed
 - Clear memory layout with no hidden complexity
-- Text console for debugging and text-based output
+- Text console for debugging, text-based output, and user input
 
 ---
 
@@ -50,7 +50,7 @@ HackVM is a 16-bit virtual machine designed for hackathon competitions. It featu
 | Stack | Grows downward |
 | Clock Speed | 4 MHz (4,000,000 cycles/second) |
 | Display | 128x128 pixels, 8-bit color (RGB332) |
-| Console | Text output buffer (4KB) |
+| Console | Text I/O buffer (4KB output, 256B input) |
 
 ---
 
@@ -312,6 +312,8 @@ MEMSET:  R0 = destination address
 
 ### 5.9 Console Instructions
 
+#### Output Instructions
+
 | Mnemonic | Operands | Description | Flags Affected |
 |----------|----------|-------------|----------------|
 | `PUTC` | Rs | Write low byte of Rs as ASCII character to console | None |
@@ -319,14 +321,34 @@ MEMSET:  R0 = destination address
 | `PUTI` | Rs | Write Rs as unsigned decimal integer to console | None |
 | `PUTX` | Rs | Write Rs as 4-digit hexadecimal (with 0x prefix) to console | None |
 
-**Notes:**
+#### Input Instructions
+
+| Mnemonic | Operands | Description | Flags Affected |
+|----------|----------|-------------|----------------|
+| `GETC` | Rd | Read one character from console input into Rd (blocks until available) | Z |
+| `GETS` | Rd | Read line from console into buffer at [Rd] (blocks until Enter) | None |
+| `KBHIT` | Rd | Check if console input is available; Rd = 1 if yes, 0 if no (non-blocking) | Z |
+
+**Output Notes:**
 - Console output is displayed in a text area below the graphics display
-- The console buffer is 4KB and operates as a circular buffer (oldest text discarded when full)
+- The output buffer is 4KB and operates as a circular buffer (oldest text discarded when full)
 - `PUTC` writes a single ASCII character (0x20-0x7E printable, plus `\n` for newline)
 - `PUTS` writes characters until a null byte (0x00) is encountered; max 256 chars per call
 - `PUTI` converts the 16-bit unsigned value to decimal (0-65535)
 - `PUTX` outputs format `0xNNNN` (always 4 hex digits, uppercase)
 - Control characters: `\n` (0x0A) creates a new line, `\r` (0x0D) is ignored
+
+**Input Notes:**
+- Console input comes from a text input field in the emulator UI
+- The input buffer holds up to 256 characters
+- `GETC` blocks execution until a character is available, returns ASCII value in low byte (high byte = 0)
+- `GETC` sets the Zero flag if no input is available (useful after timeout patterns)
+- `GETS` reads until Enter is pressed, stores null-terminated string at buffer address
+- `GETS` maximum input length is 255 characters (plus null terminator)
+- `GETS` echoes typed characters to the console output automatically
+- `KBHIT` is non-blocking: returns immediately with 1 if input waiting, 0 if not
+- `KBHIT` sets Zero flag if no input available (Rd = 0), clears it if input ready (Rd = 1)
+- Backspace (0x08) is handled during `GETS` to allow editing
 
 **Cycle Costs:**
 | Instruction | Cycles | Notes |
@@ -335,6 +357,9 @@ MEMSET:  R0 = destination address
 | `PUTS` | 3 + N | N = string length (max 256) |
 | `PUTI` | 8 | Decimal conversion + output |
 | `PUTX` | 6 | Hex conversion + output |
+| `GETC` | 2 | Blocking read (+ wait time) |
+| `GETS` | 4 + N | N = characters read (+ wait time) |
+| `KBHIT` | 2 | Non-blocking check |
 
 **Example Usage:**
 ```asm
@@ -361,6 +386,54 @@ MEMSET:  R0 = destination address
 ; Data section
 message:
     .db "Hello, World!", 0
+```
+
+**Input Example Usage:**
+```asm
+; Read a single character
+    MOVI    R0, prompt
+    PUTS    R0              ; "Press any key: "
+    GETC    R1              ; Wait for and read character
+    MOVI    R0, got_msg
+    PUTS    R0              ; "You pressed: "
+    PUTC    R1              ; Echo the character
+    MOVI    R0, 0x0A
+    PUTC    R0              ; Newline
+
+prompt:
+    .db "Press any key: ", 0
+got_msg:
+    .db "You pressed: ", 0
+
+; Read a line of text
+    MOVI    R0, name_prompt
+    PUTS    R0              ; "Enter your name: "
+    MOVI    R0, buffer      ; Buffer address
+    GETS    R0              ; Read line into buffer
+    MOVI    R0, hello_msg
+    PUTS    R0              ; "Hello, "
+    MOVI    R0, buffer
+    PUTS    R0              ; Print the name
+    MOVI    R0, 0x0A
+    PUTC    R0              ; Newline
+
+name_prompt:
+    .db "Enter your name: ", 0
+hello_msg:
+    .db "Hello, ", 0
+buffer:
+    .ds 256                 ; Reserve 256 bytes for input
+
+; Non-blocking input check
+check_input:
+    KBHIT   R0              ; Check if input available
+    JZ      no_input        ; Zero flag set = no input
+    GETC    R1              ; Read the waiting character
+    ; ... process input ...
+    RET
+no_input:
+    ; No input, continue with other work
+    RET
 ```
 
 **Debugging Example:**
@@ -411,6 +484,9 @@ Byte 3: [IMM_HIGH]                                  (if needed)
 | 0x07 | PUTS | Rs | 2 |
 | 0x08 | PUTI | Rs | 2 |
 | 0x09 | PUTX | Rs | 2 |
+| 0x0A | GETC | Rd | 2 |
+| 0x0B | GETS | Rd | 2 |
+| 0x0C | KBHIT | Rd | 2 |
 | 0x10 | MOV | Rd, Rs | 2 |
 | 0x11 | MOVI | Rd, imm16 | 4 |
 | 0x12 | LOAD | Rd, [Rs] | 2 |
@@ -750,11 +826,13 @@ The console provides a text output channel separate from the graphics display. I
 
 | Property | Value |
 |----------|-------|
-| Buffer Size | 4096 characters |
+| Output Buffer Size | 4096 characters |
+| Input Buffer Size | 256 characters |
 | Character Set | ASCII (0x20-0x7E printable) |
-| Control Characters | 0x0A (newline) |
-| Buffer Type | Circular (oldest discarded when full) |
-| Max String Length | 256 characters per PUTS call |
+| Control Characters | 0x0A (newline), 0x08 (backspace for input) |
+| Output Buffer Type | Circular (oldest discarded when full) |
+| Max Output String | 256 characters per PUTS call |
+| Max Input String | 255 characters per GETS call |
 
 ### Console Instructions
 
@@ -779,6 +857,28 @@ The console provides a text output channel separate from the graphics display. I
 - Outputs Rs in format `0xNNNN`
 - Always 4 hex digits, uppercase (A-F)
 - Cycle cost: 6
+
+**GETC Rd** - Read single character (blocking)
+- Blocks execution until a character is typed
+- Returns ASCII value in Rd (0x00-0xFF in low byte, high byte = 0)
+- Sets Zero flag if input buffer was empty when called
+- Cycle cost: 2 (plus blocking time)
+
+**GETS Rd** - Read line of text (blocking)
+- Rd contains the memory address where the string will be stored
+- Blocks until the user presses Enter
+- Stores null-terminated string at the buffer address
+- Maximum 255 characters (truncates if longer)
+- Echoes typed characters to console output
+- Handles backspace for editing
+- Cycle cost: 4 + N (plus blocking time)
+
+**KBHIT Rd** - Check for input (non-blocking)
+- Returns immediately without blocking
+- Rd = 1 if input is waiting, Rd = 0 if no input
+- Sets Zero flag if no input available (Rd = 0)
+- Clears Zero flag if input ready (Rd = 1)
+- Cycle cost: 2
 
 ### Console Output Examples
 
@@ -832,6 +932,102 @@ print_regs:
 
 r0_label:
     .db "R0=", 0
+```
+
+### Console Input Examples
+
+```asm
+; Simple greeting program
+.org 0x0000
+
+    ; Ask for name
+    MOVI    R0, prompt
+    PUTS    R0
+    
+    ; Read name into buffer
+    MOVI    R0, name_buf
+    GETS    R0
+    
+    ; Print greeting
+    MOVI    R0, greeting
+    PUTS    R0
+    MOVI    R0, name_buf
+    PUTS    R0
+    MOVI    R0, '!'
+    PUTC    R0
+    MOVI    R0, 0x0A
+    PUTC    R0
+    
+    HALT
+
+prompt:
+    .db "What is your name? ", 0
+greeting:
+    .db "Hello, ", 0
+name_buf:
+    .ds 256
+```
+
+```asm
+; Non-blocking input in game loop
+main_loop:
+    ; Check for input without blocking
+    KBHIT   R0
+    JZ      no_input        ; No input, skip
+    
+    ; Input available, read it
+    GETC    R1
+    CMPI    R1, 'q'         ; Check for quit
+    JZ      quit
+    ; ... handle other input ...
+    
+no_input:
+    ; Continue game logic
+    CALL    update_game
+    CALL    render
+    DISPLAY
+    JMP     main_loop
+
+quit:
+    HALT
+```
+
+```asm
+; Simple calculator
+.org 0x0000
+
+calc_loop:
+    ; Get first number
+    MOVI    R0, num1_prompt
+    PUTS    R0
+    MOVI    R0, input_buf
+    GETS    R0
+    ; (would need string-to-int conversion here)
+    
+    ; Get operator
+    MOVI    R0, op_prompt
+    PUTS    R0
+    GETC    R1              ; Read single character
+    MOVI    R0, 0x0A
+    PUTC    R0
+    
+    ; Get second number
+    MOVI    R0, num2_prompt
+    PUTS    R0
+    MOVI    R0, input_buf
+    GETS    R0
+    
+    ; ... perform calculation and display result ...
+    JMP     calc_loop
+
+num1_prompt:
+    .db "Enter first number: ", 0
+op_prompt:
+    .db "Enter operator (+,-,*,/): ", 0
+num2_prompt:
+    .db "Enter second number: ", 0
+input_buf:
+    .ds 32
 ```
 
 ### Console vs Graphics
@@ -1439,7 +1635,7 @@ done_msg:
 ```
 Clock Speed:  4 MHz (66,667 cycles/frame @60fps)
 Word Size:    16-bit, little-endian
-Console:      4KB text buffer
+Console:      4KB output buffer, 256B input buffer
 ```
 
 ### Registers
@@ -1485,6 +1681,9 @@ PUTC Rs         [2]     Write character (low byte of Rs)
 PUTS Rs         [3+N]   Write string at [Rs]
 PUTI Rs         [8]     Write Rs as decimal
 PUTX Rs         [6]     Write Rs as hex (0xNNNN)
+GETC Rd         [2+]    Read character into Rd (blocking)
+GETS Rd         [4+N+]  Read line into [Rd] (blocking)
+KBHIT Rd        [2]     Check if input available (non-blocking)
 ```
 
 ### MEMCPY / MEMSET Register Convention
@@ -1519,4 +1718,4 @@ Print hex value              6 cycles
 
 ---
 
-*End of HackVM Specification v1.2*
+*End of HackVM Specification v1.3*
