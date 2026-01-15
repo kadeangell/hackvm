@@ -22,14 +22,20 @@ export fn reset() void {
     cpu.reset();
 }
 
-/// Run for up to max_cycles cycles or until DISPLAY/HALT
+/// Run for up to max_cycles cycles or until DISPLAY/HALT/waiting for input
 /// Returns: cycles actually executed
 export fn run(max_cycles: u32) u32 {
     var cycles_run: u32 = 0;
     cpu.display_requested = false;
 
     while (cycles_run < max_cycles and !cpu.halted and !cpu.display_requested) {
-        cycles_run += cpu.step();
+        const step_cycles = cpu.step();
+        cycles_run += step_cycles;
+
+        // If waiting for input and no cycles executed, break to let JS handle it
+        if (cpu.waiting_for_input and step_cycles == 0) {
+            break;
+        }
     }
 
     return cycles_run;
