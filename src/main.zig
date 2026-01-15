@@ -119,3 +119,25 @@ export fn consumeConsoleUpdate() bool {
 export fn clearConsole() void {
     cpu.clearConsole();
 }
+
+// ============ Console Input ============
+
+/// Push a character to the input buffer
+export fn pushConsoleInput(ch: u8) void {
+    cpu.pushInput(ch);
+}
+
+/// Check if CPU is waiting for input
+export fn isWaitingForInput() bool {
+    return cpu.isWaitingForInput();
+}
+
+/// Get current input mode (0=none, 1=GETC, 2=GETS)
+export fn getInputMode() u8 {
+    return cpu.getInputMode();
+}
+
+/// Clear input buffer
+export fn clearInput() void {
+    cpu.clearInput();
+}

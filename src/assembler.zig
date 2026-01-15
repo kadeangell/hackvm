@@ -226,9 +226,9 @@ pub const Assembler = struct {
             },
 
             // Rd only
-            .INC, .DEC, .NEG, .NOT, .POP => {
+            .INC, .DEC, .NEG, .NOT, .POP, .GETC, .GETS, .KBHIT => {
                 const rd = try self.parseRegister(lexer, mnemonic.line);
-                try self.output.append(self.allocator,regByte(rd, 0));
+                try self.output.append(self.allocator, regByte(rd, 0));
                 self.current_address +%= 1;
             },
 
@@ -623,6 +623,9 @@ pub const Assembler = struct {
             .{ "PUTS", .PUTS },
             .{ "PUTI", .PUTI },
             .{ "PUTX", .PUTX },
+            .{ "GETC", .GETC },
+            .{ "GETS", .GETS },
+            .{ "KBHIT", .KBHIT },
             .{ "MOV", .MOV },
             .{ "MOVI", .MOVI },
             .{ "LOAD", .LOAD },

@@ -117,11 +117,20 @@ export function useEmulator() {
       },
       cycles: wasm.getCyclesExecuted(),
       halted: wasm.isHalted(),
+      waitingForInput: wasm.isWaitingForInput(),
+      inputMode: wasm.getInputMode(),
     }));
 
     // Also update console
     updateConsole();
   }, [updateConsole]);
+
+  // Push input character to the emulator
+  const pushInput = useCallback((char: number) => {
+    const wasm = wasmRef.current;
+    if (!wasm) return;
+    wasm.pushConsoleInput(char);
+  }, []);
 
   // Main emulation frame loop
   const frame = useCallback((timestamp: number) => {
@@ -165,11 +174,23 @@ export function useEmulator() {
         fps: frameCountRef.current,
         mhz: cyclesThisSecondRef.current / 1000000,
         cycles: wasm.getCyclesExecuted(),
+        waitingForInput: wasm.isWaitingForInput(),
+        inputMode: wasm.getInputMode(),
       }));
-      
+
       frameCountRef.current = 0;
       cyclesThisSecondRef.current = 0;
       lastFpsUpdateRef.current = timestamp;
+    }
+
+    // Update input waiting state more frequently
+    const isWaiting = wasm.isWaitingForInput();
+    if (isWaiting !== state.waitingForInput) {
+      setState(prev => ({
+        ...prev,
+        waitingForInput: isWaiting,
+        inputMode: wasm.getInputMode(),
+      }));
     }
     
     // Check for halt
@@ -180,7 +201,7 @@ export function useEmulator() {
     }
     
     animationFrameRef.current = requestAnimationFrame(frame);
-  }, [state.running, speedMultiplier, renderFramebuffer, updateState, updateConsole]);
+  }, [state.running, state.waitingForInput, speedMultiplier, renderFramebuffer, updateState, updateConsole]);
 
   // Start emulation
   const start = useCallback(() => {
@@ -306,5 +327,6 @@ export function useEmulator() {
     handleKeyDown,
     handleKeyUp,
     clearConsole,
+    pushInput,
   };
 }

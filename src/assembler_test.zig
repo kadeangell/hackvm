@@ -1139,6 +1139,9 @@ test "asm: instruction sizes are correct" {
     try std.testing.expectEqual(@as(usize, 2), (try asm_inst.assemble("PUTS R0")).len);
     try std.testing.expectEqual(@as(usize, 2), (try asm_inst.assemble("PUTI R0")).len);
     try std.testing.expectEqual(@as(usize, 2), (try asm_inst.assemble("PUTX R0")).len);
+    try std.testing.expectEqual(@as(usize, 2), (try asm_inst.assemble("GETC R0")).len);
+    try std.testing.expectEqual(@as(usize, 2), (try asm_inst.assemble("GETS R0")).len);
+    try std.testing.expectEqual(@as(usize, 2), (try asm_inst.assemble("KBHIT R0")).len);
 
     // 3-byte instructions
     try std.testing.expectEqual(@as(usize, 3), (try asm_inst.assemble("ADDI R0, 1")).len);
@@ -1363,4 +1366,125 @@ test "asm: hex output program" {
     // Check PUTX R0
     try std.testing.expectEqual(@as(u8, 0x09), output[4]); // PUTX opcode
     try std.testing.expectEqual(@as(u8, 0x00), output[5]); // Rs=0
+}
+
+// ============================================================================
+// Assembler - Console Input Instructions
+// ============================================================================
+
+test "asm: GETC R0" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    // GETC uses Rd field: reg_byte = (rd<<5)|(0<<2) = rd<<5
+    const output = try asm_inst.assemble("GETC R0");
+    try expectBytes(&[_]u8{ 0x0A, 0x00 }, output);
+}
+
+test "asm: GETC R3" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    // Rd=3: reg_byte = 3<<5 = 0x60
+    const output = try asm_inst.assemble("GETC R3");
+    try expectBytes(&[_]u8{ 0x0A, 0x60 }, output);
+}
+
+test "asm: GETC R7" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    // Rd=7: reg_byte = 7<<5 = 0xE0
+    const output = try asm_inst.assemble("GETC R7");
+    try expectBytes(&[_]u8{ 0x0A, 0xE0 }, output);
+}
+
+test "asm: GETS R0" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    const output = try asm_inst.assemble("GETS R0");
+    try expectBytes(&[_]u8{ 0x0B, 0x00 }, output);
+}
+
+test "asm: GETS R5" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    // Rd=5: reg_byte = 5<<5 = 0xA0
+    const output = try asm_inst.assemble("GETS R5");
+    try expectBytes(&[_]u8{ 0x0B, 0xA0 }, output);
+}
+
+test "asm: KBHIT R0" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    const output = try asm_inst.assemble("KBHIT R0");
+    try expectBytes(&[_]u8{ 0x0C, 0x00 }, output);
+}
+
+test "asm: KBHIT R4" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    // Rd=4: reg_byte = 4<<5 = 0x80
+    const output = try asm_inst.assemble("KBHIT R4");
+    try expectBytes(&[_]u8{ 0x0C, 0x80 }, output);
+}
+
+test "asm: input instructions case insensitive" {
+    var asm1 = Assembler.init(std.testing.allocator);
+    defer asm1.deinit();
+    var asm2 = Assembler.init(std.testing.allocator);
+    defer asm2.deinit();
+    var asm3 = Assembler.init(std.testing.allocator);
+    defer asm3.deinit();
+
+    const output1 = try asm1.assemble("getc r0");
+    const output2 = try asm2.assemble("GETC R0");
+    const output3 = try asm3.assemble("Getc r0");
+
+    try expectBytes(output1, output2);
+    try expectBytes(output2, output3);
+}
+
+test "asm: input program with KBHIT and GETC" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    const source =
+        \\wait:
+        \\    KBHIT R0
+        \\    JZ wait
+        \\    GETC R1
+        \\    PUTC R1
+        \\    HALT
+    ;
+
+    const output = try asm_inst.assemble(source);
+
+    // KBHIT R0 (2 bytes) at 0x0000
+    // JZ wait (3 bytes) at 0x0002 - jumps to 0x0000
+    // GETC R1 (2 bytes) at 0x0005
+    // PUTC R1 (2 bytes) at 0x0007
+    // HALT (1 byte) at 0x0009
+    try std.testing.expectEqual(@as(usize, 10), output.len);
+
+    // Check KBHIT R0
+    try std.testing.expectEqual(@as(u8, 0x0C), output[0]); // KBHIT opcode
+    try std.testing.expectEqual(@as(u8, 0x00), output[1]); // Rd=0
+
+    // Check JZ wait (addr = 0x0000)
+    try std.testing.expectEqual(@as(u8, 0x52), output[2]); // JZ opcode
+    try std.testing.expectEqual(@as(u8, 0x00), output[3]); // addr low
+    try std.testing.expectEqual(@as(u8, 0x00), output[4]); // addr high
+
+    // Check GETC R1 (Rd=1: reg_byte = 1<<5 = 0x20)
+    try std.testing.expectEqual(@as(u8, 0x0A), output[5]); // GETC opcode
+    try std.testing.expectEqual(@as(u8, 0x20), output[6]); // Rd=1
+
+    // Check PUTC R1 (Rs=1: reg_byte = 1<<2 = 0x04)
+    try std.testing.expectEqual(@as(u8, 0x06), output[7]); // PUTC opcode
+    try std.testing.expectEqual(@as(u8, 0x04), output[8]); // Rs=1
 }

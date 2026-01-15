@@ -99,6 +99,7 @@ function EmulatorPage({
   handleKeyDown,
   handleKeyUp,
   clearConsole,
+  pushInput,
 }: {
   state: {
     running: boolean;
@@ -112,6 +113,8 @@ function EmulatorPage({
     fps: number;
     mhz: number;
     consoleOutput: string;
+    waitingForInput: boolean;
+    inputMode: number;
   };
   wasmLoaded: boolean;
   speedMultiplier: number;
@@ -125,6 +128,7 @@ function EmulatorPage({
   handleKeyDown: (e: KeyboardEvent) => void;
   handleKeyUp: (e: KeyboardEvent) => void;
   clearConsole: () => void;
+  pushInput: (char: number) => void;
 }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-5">
@@ -154,6 +158,9 @@ function EmulatorPage({
         <Console
           output={state.consoleOutput}
           onClear={clearConsole}
+          waitingForInput={state.waitingForInput}
+          inputMode={state.inputMode}
+          onInput={pushInput}
         />
       </Card>
 
@@ -201,6 +208,7 @@ export default function App() {
     handleKeyDown,
     handleKeyUp,
     clearConsole,
+    pushInput,
   } = useEmulator();
 
   const { loaded: assemblerLoaded, assemble } = useAssembler();
@@ -272,6 +280,7 @@ export default function App() {
                 handleKeyDown={handleKeyDown}
                 handleKeyUp={handleKeyUp}
                 clearConsole={clearConsole}
+                pushInput={pushInput}
               />
             }
           />

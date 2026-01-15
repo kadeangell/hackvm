@@ -27,6 +27,9 @@ pub const Flags = packed struct(u8) {
 /// Console buffer size (4KB)
 pub const CONSOLE_BUFFER_SIZE: usize = 4096;
 
+/// Console input buffer size (256 bytes)
+pub const INPUT_BUFFER_SIZE: usize = 256;
+
 pub const CPU = struct {
     /// General purpose registers R0-R7
     r: [8]u16,
@@ -64,6 +67,30 @@ pub const CPU = struct {
     /// Flag indicating new console output is available
     console_updated: bool,
 
+    /// Console input buffer
+    input_buffer: [INPUT_BUFFER_SIZE]u8,
+
+    /// Number of valid bytes in input buffer
+    input_length: u8,
+
+    /// Read position in input buffer
+    input_read_pos: u8,
+
+    /// Flag indicating CPU is waiting for input
+    waiting_for_input: bool,
+
+    /// Input mode: 0=none, 1=GETC, 2=GETS
+    input_mode: u8,
+
+    /// Target register for input instruction
+    input_target_reg: u3,
+
+    /// Buffer address for GETS
+    gets_buffer_addr: u16,
+
+    /// Current length written by GETS
+    gets_length: u8,
+
     const INITIAL_SP: u16 = 0xFFEF;
 
     pub fn init(mem: *Memory) CPU {
@@ -80,6 +107,14 @@ pub const CPU = struct {
             .console_write_pos = 0,
             .console_length = 0,
             .console_updated = false,
+            .input_buffer = [_]u8{0} ** INPUT_BUFFER_SIZE,
+            .input_length = 0,
+            .input_read_pos = 0,
+            .waiting_for_input = false,
+            .input_mode = 0,
+            .input_target_reg = 0,
+            .gets_buffer_addr = 0,
+            .gets_length = 0,
         };
     }
 
@@ -95,6 +130,14 @@ pub const CPU = struct {
         self.console_write_pos = 0;
         self.console_length = 0;
         self.console_updated = false;
+        @memset(&self.input_buffer, 0);
+        self.input_length = 0;
+        self.input_read_pos = 0;
+        self.waiting_for_input = false;
+        self.input_mode = 0;
+        self.input_target_reg = 0;
+        self.gets_buffer_addr = 0;
+        self.gets_length = 0;
     }
 
     /// Write a single character to the console buffer
@@ -141,14 +184,113 @@ pub const CPU = struct {
         self.console_updated = false;
     }
 
+    /// Push a character to the input buffer (called from JS)
+    pub fn pushInput(self: *CPU, ch: u8) void {
+        if (self.input_length < INPUT_BUFFER_SIZE) {
+            self.input_buffer[self.input_length] = ch;
+            self.input_length += 1;
+        }
+    }
+
+    /// Check if input is available
+    pub fn hasInput(self: *const CPU) bool {
+        return self.input_read_pos < self.input_length;
+    }
+
+    /// Read a character from input buffer
+    fn readInputChar(self: *CPU) ?u8 {
+        if (self.input_read_pos < self.input_length) {
+            const ch = self.input_buffer[self.input_read_pos];
+            self.input_read_pos += 1;
+
+            // If buffer is fully consumed, reset positions
+            if (self.input_read_pos >= self.input_length) {
+                self.input_read_pos = 0;
+                self.input_length = 0;
+            }
+
+            return ch;
+        }
+        return null;
+    }
+
+    /// Clear input buffer
+    pub fn clearInput(self: *CPU) void {
+        @memset(&self.input_buffer, 0);
+        self.input_length = 0;
+        self.input_read_pos = 0;
+        self.waiting_for_input = false;
+        self.input_mode = 0;
+    }
+
+    /// Check if CPU is waiting for input
+    pub fn isWaitingForInput(self: *const CPU) bool {
+        return self.waiting_for_input;
+    }
+
+    /// Get current input mode (0=none, 1=GETC, 2=GETS)
+    pub fn getInputMode(self: *const CPU) u8 {
+        return self.input_mode;
+    }
+
     /// Execute one instruction, return cycle cost
     pub fn step(self: *CPU) u32 {
         if (self.halted) return 0;
+
+        // If waiting for input, try to complete the pending instruction
+        if (self.waiting_for_input) {
+            const cost = self.handlePendingInput();
+            if (cost > 0) {
+                self.cycles += cost;
+            }
+            return cost;
+        }
 
         const opcode_byte = self.fetch8();
         const cost = self.execute(opcode_byte);
         self.cycles += cost;
         return cost;
+    }
+
+    /// Handle pending input instruction (GETC or GETS)
+    fn handlePendingInput(self: *CPU) u32 {
+        if (self.input_mode == 1) {
+            // GETC mode - need one character
+            if (self.readInputChar()) |ch| {
+                self.r[self.input_target_reg] = ch;
+                self.flags.z = (ch == 0);
+                self.waiting_for_input = false;
+                self.input_mode = 0;
+                self.pc +%= 2; // Advance past the instruction
+                return 2;
+            }
+        } else if (self.input_mode == 2) {
+            // GETS mode - read until newline
+            while (self.readInputChar()) |ch| {
+                if (ch == 0x0A) { // Newline
+                    // Null-terminate the string
+                    self.mem.write8(self.gets_buffer_addr, 0);
+                    self.r[self.input_target_reg] = self.gets_length;
+                    self.waiting_for_input = false;
+                    self.input_mode = 0;
+                    self.pc +%= 2; // Advance past the instruction
+                    return 4 + @as(u32, self.gets_length);
+                }
+
+                // Echo the character
+                self.consoleWriteChar(ch);
+
+                // Store character at buffer address
+                if (self.gets_length < 255) {
+                    self.mem.write8(self.gets_buffer_addr, ch);
+                    self.gets_buffer_addr +%= 1;
+                    self.gets_length += 1;
+                }
+            }
+            // Still waiting for more input
+        }
+
+        return 0; // Still waiting
     }
 
     /// Fetch 8-bit value at PC and increment PC
@@ -316,6 +458,71 @@ pub const CPU = struct {
                 self.consoleWriteChar(hex_chars[val & 0xF]);
 
                 return 6;
+            },
+
+            .GETC => {
+                const regs = decodeRegs(self.fetch8());
+                if (self.readInputChar()) |ch| {
+                    // Input available - complete immediately
+                    self.r[regs.rd] = ch;
+                    self.flags.z = (ch == 0);
+                    return 2;
+                } else {
+                    // No input - enter waiting state
+                    self.waiting_for_input = true;
+                    self.input_mode = 1; // GETC mode
+                    self.input_target_reg = regs.rd;
+                    // Don't advance PC past the instruction
+                    self.pc -%= 2;
+                    return 0;
+                }
+            },
+
+            .GETS => {
+                const regs = decodeRegs(self.fetch8());
+                // Initialize GETS state
+                self.gets_buffer_addr = self.r[regs.rd];
+                self.gets_length = 0;
+                self.input_target_reg = regs.rd;
+
+                // Try to read available input
+                while (self.readInputChar()) |ch| {
+                    if (ch == 0x0A) { // Newline - done
+                        // Null-terminate the string
+                        self.mem.write8(self.gets_buffer_addr, 0);
+                        self.r[regs.rd] = self.gets_length;
+                        return 4 + @as(u32, self.gets_length);
+                    }
+
+                    // Echo the character
+                    self.consoleWriteChar(ch);
+
+                    // Store character at buffer address
+                    if (self.gets_length < 255) {
+                        self.mem.write8(self.gets_buffer_addr, ch);
+                        self.gets_buffer_addr +%= 1;
+                        self.gets_length += 1;
+                    }
+                }
+
+                // Need more input - enter waiting state
+                self.waiting_for_input = true;
+                self.input_mode = 2; // GETS mode
+                // Don't advance PC past the instruction
+                self.pc -%= 2;
+                return 0;
+            },
+
+            .KBHIT => {
+                const regs = decodeRegs(self.fetch8());
+                if (self.hasInput()) {
+                    self.r[regs.rd] = 1;
+                    self.flags.z = false;
+                } else {
+                    self.r[regs.rd] = 0;
+                    self.flags.z = true;
+                }
+                return 2;
             },
 
             // ============ Data Movement ============
@@ -1218,4 +1425,173 @@ test "console different registers" {
 
     try std.testing.expectEqual(@as(u16, 2), cpu.console_length);
     try std.testing.expectEqualStrings("42", cpu.console_buffer[0..2]);
+}
+
+// ============ Console Input Tests ============
+
+test "kbhit no input" {
+    var mem = Memory.init();
+    var cpu = CPU.init(&mem);
+
+    // KBHIT R0
+    mem.data[0] = @intFromEnum(Opcode.KBHIT);
+    mem.data[1] = 0b000_000_00; // Rd=0
+
+    const cycles = cpu.step();
+
+    try std.testing.expectEqual(@as(u32, 2), cycles);
+    try std.testing.expectEqual(@as(u16, 0), cpu.r[0]);
+    try std.testing.expect(cpu.flags.z); // Z flag set when no input
+}
+
+test "kbhit with input" {
+    var mem = Memory.init();
+    var cpu = CPU.init(&mem);
+
+    // Pre-populate input buffer
+    cpu.pushInput('A');
+
+    // KBHIT R0
+    mem.data[0] = @intFromEnum(Opcode.KBHIT);
+    mem.data[1] = 0b000_000_00; // Rd=0
+
+    const cycles = cpu.step();
+
+    try std.testing.expectEqual(@as(u32, 2), cycles);
+    try std.testing.expectEqual(@as(u16, 1), cpu.r[0]);
+    try std.testing.expect(!cpu.flags.z); // Z flag clear when input available
+}
+
+test "kbhit different register" {
+    var mem = Memory.init();
+    var cpu = CPU.init(&mem);
+
+    cpu.pushInput('X');
+
+    // KBHIT R3 (Rd=3: reg_byte = 3<<5 = 0x60)
+    mem.data[0] = @intFromEnum(Opcode.KBHIT);
+    mem.data[1] = 0x60; // Rd=3
+
+    _ = cpu.step();
+
+    try std.testing.expectEqual(@as(u16, 1), cpu.r[3]);
+}
+
+test "getc with input available" {
+    var mem = Memory.init();
+    var cpu = CPU.init(&mem);
+
+    // Pre-populate input buffer
+    cpu.pushInput('A');
+
+    // GETC R0
+    mem.data[0] = @intFromEnum(Opcode.GETC);
+    mem.data[1] = 0b000_000_00; // Rd=0
+
+    const cycles = cpu.step();
+
+    try std.testing.expectEqual(@as(u32, 2), cycles);
+    try std.testing.expectEqual(@as(u16, 'A'), cpu.r[0]);
+    try std.testing.expect(!cpu.waiting_for_input);
+}
+
+test "getc blocking when no input" {
+    var mem = Memory.init();
+    var cpu = CPU.init(&mem);
+
+    // GETC R0
+    mem.data[0] = @intFromEnum(Opcode.GETC);
+    mem.data[1] = 0b000_000_00; // Rd=0
+
+    const cycles = cpu.step();
+
+    try std.testing.expectEqual(@as(u32, 0), cycles);
+    try std.testing.expect(cpu.waiting_for_input);
+    try std.testing.expectEqual(@as(u8, 1), cpu.input_mode); // GETC mode
+    try std.testing.expectEqual(@as(u16, 0), cpu.pc); // PC not advanced
+}
+
+test "getc completes when input arrives" {
+    var mem = Memory.init();
+    var cpu = CPU.init(&mem);
+
+    // GETC R0
+    mem.data[0] = @intFromEnum(Opcode.GETC);
+    mem.data[1] = 0b000_000_00; // Rd=0
+
+    // First step - blocks
+    _ = cpu.step();
+    try std.testing.expect(cpu.waiting_for_input);
+
+    // Push input
+    cpu.pushInput('B');
+
+    // Second step - completes
+    const cycles = cpu.step();
+    try std.testing.expectEqual(@as(u32, 2), cycles);
+    try std.testing.expect(!cpu.waiting_for_input);
+    try std.testing.expectEqual(@as(u16, 'B'), cpu.r[0]);
+    try std.testing.expectEqual(@as(u16, 2), cpu.pc); // PC advanced past instruction
+}
+
+test "getc sets z flag for null character" {
+    var mem = Memory.init();
+    var cpu = CPU.init(&mem);
+
+    cpu.pushInput(0);
+
+    // GETC R0
+    mem.data[0] = @intFromEnum(Opcode.GETC);
+    mem.data[1] = 0b000_000_00;
+
+    _ = cpu.step();
+
+    try std.testing.expectEqual(@as(u16, 0), cpu.r[0]);
+    try std.testing.expect(cpu.flags.z); // Z set for null
+}
+
+test "input buffer push and read" {
+    var mem = Memory.init();
+    var cpu = CPU.init(&mem);
+
+    try std.testing.expect(!cpu.hasInput());
+
+    cpu.pushInput('A');
+    cpu.pushInput('B');
+    cpu.pushInput('C');
+
+    try std.testing.expect(cpu.hasInput());
+    try std.testing.expectEqual(@as(u8, 3), cpu.input_length);
+}
+
+test "input clear" {
+    var mem = Memory.init();
+    var cpu = CPU.init(&mem);
+
+    cpu.pushInput('A');
+    cpu.pushInput('B');
+    cpu.waiting_for_input = true;
+    cpu.input_mode = 1;
+
+    cpu.clearInput();
+
+    try std.testing.expect(!cpu.hasInput());
+    try std.testing.expectEqual(@as(u8, 0), cpu.input_length);
+    try std.testing.expect(!cpu.waiting_for_input);
+    try std.testing.expectEqual(@as(u8, 0), cpu.input_mode);
+}
+
+test "getc different register" {
+    var mem = Memory.init();
+    var cpu = CPU.init(&mem);
+
+    cpu.pushInput('Z');
+
+    // GETC R5 (Rd=5: reg_byte = 5<<5 = 0xA0)
+    mem.data[0] = @intFromEnum(Opcode.GETC);
+    mem.data[1] = 0xA0; // Rd=5
+
+    _ = cpu.step();
+
+    try std.testing.expectEqual(@as(u16, 'Z'), cpu.r[5]);
 }
