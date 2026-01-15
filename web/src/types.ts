@@ -15,6 +15,11 @@ export interface HackVMExports {
   getSP: () => number;
   getRegister: (index: number) => number;
   getFlags: () => number;
+  // Console I/O
+  getConsoleBufferPtr: () => number;
+  getConsoleLength: () => number;
+  consumeConsoleUpdate: () => boolean;
+  clearConsole: () => void;
 }
 
 export interface EmulatorState {
@@ -33,6 +38,7 @@ export interface EmulatorState {
   cycles: bigint;
   fps: number;
   mhz: number;
+  consoleOutput: string;
 }
 
 export const KEY_MAP: Record<string, number> = {
@@ -90,4 +96,5 @@ export const INITIAL_STATE: EmulatorState = {
   cycles: BigInt(0),
   fps: 0,
   mhz: 0,
+  consoleOutput: '',
 };

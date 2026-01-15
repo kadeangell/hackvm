@@ -7,3 +7,4 @@ export { Stats } from './Stats';
 export { Status } from './Status';
 export { Editor } from './Editor';
 export { Docs } from './Docs';
+export { Console } from './Console';

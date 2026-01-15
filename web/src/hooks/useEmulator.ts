@@ -76,13 +76,34 @@ export function useEmulator() {
     ctx.putImageData(imageData, 0, 0);
   }, []);
 
+  // Read console output from WASM
+  const updateConsole = useCallback(() => {
+    const wasm = wasmRef.current;
+    if (!wasm || !wasm.consumeConsoleUpdate()) return;
+
+    const ptr = wasm.getConsoleBufferPtr();
+    const len = wasm.getConsoleLength();
+    const buffer = new Uint8Array(wasm.memory.buffer, ptr, len);
+    const text = new TextDecoder().decode(buffer);
+
+    setState(prev => ({ ...prev, consoleOutput: text }));
+  }, []);
+
+  // Clear console output
+  const clearConsole = useCallback(() => {
+    const wasm = wasmRef.current;
+    if (!wasm) return;
+    wasm.clearConsole();
+    setState(prev => ({ ...prev, consoleOutput: '' }));
+  }, []);
+
   // Update UI state from WASM
   const updateState = useCallback(() => {
     const wasm = wasmRef.current;
     if (!wasm) return;
-    
+
     const flags = wasm.getFlags();
-    
+
     setState(prev => ({
       ...prev,
       registers: Array.from({ length: 8 }, (_, i) => wasm.getRegister(i)),
@@ -97,7 +118,10 @@ export function useEmulator() {
       cycles: wasm.getCyclesExecuted(),
       halted: wasm.isHalted(),
     }));
-  }, []);
+
+    // Also update console
+    updateConsole();
+  }, [updateConsole]);
 
   // Main emulation frame loop
   const frame = useCallback((timestamp: number) => {
@@ -124,7 +148,10 @@ export function useEmulator() {
     const cyclesRun = wasm.run(targetCycles);
     cycleDebtRef.current = Math.max(0, targetCycles - cyclesRun);
     cyclesThisSecondRef.current += cyclesRun;
-    
+
+    // Update console output
+    updateConsole();
+
     // Render if DISPLAY was called
     if (wasm.displayRequested()) {
       renderFramebuffer();
@@ -153,7 +180,7 @@ export function useEmulator() {
     }
     
     animationFrameRef.current = requestAnimationFrame(frame);
-  }, [state.running, speedMultiplier, renderFramebuffer, updateState]);
+  }, [state.running, speedMultiplier, renderFramebuffer, updateState, updateConsole]);
 
   // Start emulation
   const start = useCallback(() => {
@@ -278,5 +305,6 @@ export function useEmulator() {
     loadProgram,
     handleKeyDown,
     handleKeyUp,
+    clearConsole,
   };
 }

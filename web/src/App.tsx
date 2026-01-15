@@ -14,6 +14,7 @@ import {
   Status,
   Editor,
   Docs,
+  Console,
 } from './components';
 
 function EditorPage({
@@ -97,6 +98,7 @@ function EmulatorPage({
   loadFile,
   handleKeyDown,
   handleKeyUp,
+  clearConsole,
 }: {
   state: {
     running: boolean;
@@ -109,6 +111,7 @@ function EmulatorPage({
     cycles: bigint;
     fps: number;
     mhz: number;
+    consoleOutput: string;
   };
   wasmLoaded: boolean;
   speedMultiplier: number;
@@ -121,6 +124,7 @@ function EmulatorPage({
   loadFile: (file: File) => void;
   handleKeyDown: (e: KeyboardEvent) => void;
   handleKeyUp: (e: KeyboardEvent) => void;
+  clearConsole: () => void;
 }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-5">
@@ -147,9 +151,10 @@ function EmulatorPage({
           onChange={setSpeedMultiplier}
         />
 
-        <p className="text-xs text-gray-500 text-center mt-4">
-          Click on the screen to focus, then use arrow keys for input.
-        </p>
+        <Console
+          output={state.consoleOutput}
+          onClear={clearConsole}
+        />
       </Card>
 
       <div className="flex flex-col gap-4">
@@ -195,6 +200,7 @@ export default function App() {
     loadProgram,
     handleKeyDown,
     handleKeyUp,
+    clearConsole,
   } = useEmulator();
 
   const { loaded: assemblerLoaded, assemble } = useAssembler();
@@ -265,6 +271,7 @@ export default function App() {
                 loadFile={loadFile}
                 handleKeyDown={handleKeyDown}
                 handleKeyUp={handleKeyUp}
+                clearConsole={clearConsole}
               />
             }
           />
