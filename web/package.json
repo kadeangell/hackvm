@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "build": "tsgo && vite build",
+    "preview": "vite preview",
+    "lint": "oxlint --fix --fix-suggestions --fix-dangerously",
+    "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
@@ -22,9 +24,11 @@
     "@tailwindcss/typography": "^0.5.19",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@typescript/native-preview": "7.0.0-dev.20260115.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "monaco-editor": "^0.52.0",
+    "oxlint": "^1.39.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.16",
     "typescript": "^5.7.2",

@@ -98,7 +98,7 @@ const registerHackVMLanguage: BeforeMount = (monacoInstance: Monaco) => {
         }],
 
         // Punctuation
-        [/[,\[\]]/, 'delimiter'],
+        [/[,[\]]/, 'delimiter'],
       ]
     }
   });
