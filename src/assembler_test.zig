@@ -1135,6 +1135,10 @@ test "asm: instruction sizes are correct" {
     try std.testing.expectEqual(@as(usize, 2), (try asm_inst.assemble("INC R0")).len);
     try std.testing.expectEqual(@as(usize, 2), (try asm_inst.assemble("PUSH R0")).len);
     try std.testing.expectEqual(@as(usize, 2), (try asm_inst.assemble("SHLI R0, 4")).len);
+    try std.testing.expectEqual(@as(usize, 2), (try asm_inst.assemble("PUTC R0")).len);
+    try std.testing.expectEqual(@as(usize, 2), (try asm_inst.assemble("PUTS R0")).len);
+    try std.testing.expectEqual(@as(usize, 2), (try asm_inst.assemble("PUTI R0")).len);
+    try std.testing.expectEqual(@as(usize, 2), (try asm_inst.assemble("PUTX R0")).len);
 
     // 3-byte instructions
     try std.testing.expectEqual(@as(usize, 3), (try asm_inst.assemble("ADDI R0, 1")).len);
@@ -1143,4 +1147,220 @@ test "asm: instruction sizes are correct" {
 
     // 4-byte instructions
     try std.testing.expectEqual(@as(usize, 4), (try asm_inst.assemble("MOVI R0, 0")).len);
+}
+
+// ============================================================================
+// Assembler - Console I/O Instructions
+// ============================================================================
+
+test "asm: PUTC R0" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    // PUTC uses Rs field: reg_byte = (0<<5)|(rs<<2) = rs<<2
+    const output = try asm_inst.assemble("PUTC R0");
+    try expectBytes(&[_]u8{ 0x06, 0x00 }, output);
+}
+
+test "asm: PUTC R3" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    // Rs=3: reg_byte = 3<<2 = 0x0C
+    const output = try asm_inst.assemble("PUTC R3");
+    try expectBytes(&[_]u8{ 0x06, 0x0C }, output);
+}
+
+test "asm: PUTC R7" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    // Rs=7: reg_byte = 7<<2 = 0x1C
+    const output = try asm_inst.assemble("PUTC R7");
+    try expectBytes(&[_]u8{ 0x06, 0x1C }, output);
+}
+
+test "asm: PUTS R0" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    const output = try asm_inst.assemble("PUTS R0");
+    try expectBytes(&[_]u8{ 0x07, 0x00 }, output);
+}
+
+test "asm: PUTS R5" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    // Rs=5: reg_byte = 5<<2 = 0x14
+    const output = try asm_inst.assemble("PUTS R5");
+    try expectBytes(&[_]u8{ 0x07, 0x14 }, output);
+}
+
+test "asm: PUTI R0" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    const output = try asm_inst.assemble("PUTI R0");
+    try expectBytes(&[_]u8{ 0x08, 0x00 }, output);
+}
+
+test "asm: PUTI R2" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    // Rs=2: reg_byte = 2<<2 = 0x08
+    const output = try asm_inst.assemble("PUTI R2");
+    try expectBytes(&[_]u8{ 0x08, 0x08 }, output);
+}
+
+test "asm: PUTX R0" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    const output = try asm_inst.assemble("PUTX R0");
+    try expectBytes(&[_]u8{ 0x09, 0x00 }, output);
+}
+
+test "asm: PUTX R6" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    // Rs=6: reg_byte = 6<<2 = 0x18
+    const output = try asm_inst.assemble("PUTX R6");
+    try expectBytes(&[_]u8{ 0x09, 0x18 }, output);
+}
+
+test "asm: console I/O all registers" {
+    const instrs = [_]struct { mnemonic: []const u8, opcode: u8 }{
+        .{ .mnemonic = "PUTC", .opcode = 0x06 },
+        .{ .mnemonic = "PUTS", .opcode = 0x07 },
+        .{ .mnemonic = "PUTI", .opcode = 0x08 },
+        .{ .mnemonic = "PUTX", .opcode = 0x09 },
+    };
+
+    for (instrs) |instr| {
+        // Test all 8 registers
+        for (0..8) |i| {
+            var asm_inst = Assembler.init(std.testing.allocator);
+            defer asm_inst.deinit();
+
+            var buf: [32]u8 = undefined;
+            const source = std.fmt.bufPrint(&buf, "{s} R{d}", .{ instr.mnemonic, i }) catch unreachable;
+
+            const output = asm_inst.assemble(source) catch |err| {
+                std.debug.print("Failed on {s} R{d}: {}\n", .{ instr.mnemonic, i, err });
+                return err;
+            };
+
+            try std.testing.expectEqual(instr.opcode, output[0]);
+            const expected_reg_byte: u8 = @intCast(i << 2);
+            try std.testing.expectEqual(expected_reg_byte, output[1]);
+        }
+    }
+}
+
+test "asm: console I/O case insensitivity" {
+    var asm1 = Assembler.init(std.testing.allocator);
+    defer asm1.deinit();
+    var asm2 = Assembler.init(std.testing.allocator);
+    defer asm2.deinit();
+    var asm3 = Assembler.init(std.testing.allocator);
+    defer asm3.deinit();
+
+    const output1 = try asm1.assemble("putc r0");
+    const output2 = try asm2.assemble("PUTC R0");
+    const output3 = try asm3.assemble("Putc r0");
+
+    try expectBytes(output1, output2);
+    try expectBytes(output2, output3);
+}
+
+test "asm: hello world program with console I/O" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    const source =
+        \\    MOVI R0, msg
+        \\    PUTS R0
+        \\    HALT
+        \\msg:
+        \\    .db "Hello", 0
+    ;
+
+    const output = try asm_inst.assemble(source);
+
+    // MOVI R0, msg (4 bytes) at 0x0000
+    // PUTS R0 (2 bytes) at 0x0004
+    // HALT (1 byte) at 0x0006
+    // "Hello\0" (6 bytes) at 0x0007
+    try std.testing.expectEqual(@as(usize, 13), output.len);
+
+    // Check MOVI R0, 0x0007 (msg address)
+    try std.testing.expectEqual(@as(u8, 0x11), output[0]); // MOVI opcode
+    try std.testing.expectEqual(@as(u8, 0x07), output[2]); // msg addr low
+    try std.testing.expectEqual(@as(u8, 0x00), output[3]); // msg addr high
+
+    // Check PUTS R0
+    try std.testing.expectEqual(@as(u8, 0x07), output[4]); // PUTS opcode
+    try std.testing.expectEqual(@as(u8, 0x00), output[5]); // Rs=0
+
+    // Check HALT
+    try std.testing.expectEqual(@as(u8, 0x01), output[6]); // HALT
+
+    // Check string data
+    try std.testing.expectEqualStrings("Hello", output[7..12]);
+    try std.testing.expectEqual(@as(u8, 0), output[12]); // Null terminator
+}
+
+test "asm: number printing program" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    const source =
+        \\    MOVI R0, 12345
+        \\    PUTI R0
+        \\    MOVI R1, 10
+        \\    PUTC R1
+        \\    HALT
+    ;
+
+    const output = try asm_inst.assemble(source);
+
+    // MOVI R0, 12345 (4 bytes)
+    // PUTI R0 (2 bytes)
+    // MOVI R1, 10 (4 bytes)
+    // PUTC R1 (2 bytes)
+    // HALT (1 byte)
+    try std.testing.expectEqual(@as(usize, 13), output.len);
+
+    // Check PUTI R0
+    try std.testing.expectEqual(@as(u8, 0x08), output[4]); // PUTI opcode
+    try std.testing.expectEqual(@as(u8, 0x00), output[5]); // Rs=0
+
+    // Check PUTC R1 (reg_byte = 1<<2 = 0x04)
+    try std.testing.expectEqual(@as(u8, 0x06), output[10]); // PUTC opcode
+    try std.testing.expectEqual(@as(u8, 0x04), output[11]); // Rs=1
+}
+
+test "asm: hex output program" {
+    var asm_inst = Assembler.init(std.testing.allocator);
+    defer asm_inst.deinit();
+
+    const source =
+        \\    MOVI R0, 0xABCD
+        \\    PUTX R0
+        \\    HALT
+    ;
+
+    const output = try asm_inst.assemble(source);
+
+    // MOVI R0, 0xABCD (4 bytes)
+    // PUTX R0 (2 bytes)
+    // HALT (1 byte)
+    try std.testing.expectEqual(@as(usize, 7), output.len);
+
+    // Check PUTX R0
+    try std.testing.expectEqual(@as(u8, 0x09), output[4]); // PUTX opcode
+    try std.testing.expectEqual(@as(u8, 0x00), output[5]); // Rs=0
 }

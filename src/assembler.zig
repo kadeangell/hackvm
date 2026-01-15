@@ -232,10 +232,10 @@ pub const Assembler = struct {
                 self.current_address +%= 1;
             },
 
-            // Rs only (PUSH uses Rs field)
-            .PUSH => {
+            // Rs only (PUSH and console I/O use Rs field)
+            .PUSH, .PUTC, .PUTS, .PUTI, .PUTX => {
                 const rs = try self.parseRegister(lexer, mnemonic.line);
-                try self.output.append(self.allocator,regByte(0, rs));
+                try self.output.append(self.allocator, regByte(0, rs));
                 self.current_address +%= 1;
             },
 
@@ -319,7 +319,10 @@ pub const Assembler = struct {
             var count: u16 = 0;
             while (true) {
                 const tok = self.nextToken(lexer);
-                if (tok.type == .newline or tok.type == .eof) break;
+                if (tok.type == .newline or tok.type == .eof) {
+                    self.unreadToken(tok); // Put back so skipToNewline can find it
+                    break;
+                }
                 if (tok.type == .comma) continue;
                 if (tok.type == .number or tok.type == .identifier or tok.type == .char_literal) {
                     count += 1;
@@ -332,7 +335,10 @@ pub const Assembler = struct {
             var count: u16 = 0;
             while (true) {
                 const tok = self.nextToken(lexer);
-                if (tok.type == .newline or tok.type == .eof) break;
+                if (tok.type == .newline or tok.type == .eof) {
+                    self.unreadToken(tok); // Put back so skipToNewline can find it
+                    break;
+                }
                 if (tok.type == .comma) continue;
                 if (tok.type == .number or tok.type == .identifier) {
                     count += 2;
@@ -369,7 +375,10 @@ pub const Assembler = struct {
         } else if (std.mem.eql(u8, upper, "DB")) {
             while (true) {
                 const tok = self.nextToken(lexer);
-                if (tok.type == .newline or tok.type == .eof) break;
+                if (tok.type == .newline or tok.type == .eof) {
+                    self.unreadToken(tok); // Put back so pass2 loop handles it
+                    break;
+                }
                 if (tok.type == .comma) continue;
 
                 if (tok.type == .number) {
@@ -395,7 +404,10 @@ pub const Assembler = struct {
         } else if (std.mem.eql(u8, upper, "DW")) {
             while (true) {
                 const tok = self.nextToken(lexer);
-                if (tok.type == .newline or tok.type == .eof) break;
+                if (tok.type == .newline or tok.type == .eof) {
+                    self.unreadToken(tok); // Put back so pass2 loop handles it
+                    break;
+                }
                 if (tok.type == .comma) continue;
 
                 if (tok.type == .number) {
@@ -468,6 +480,9 @@ pub const Assembler = struct {
         if (tok.type == .number) {
             const val = try self.parseNumber(tok.text);
             return @bitCast(@as(i16, @truncate(val)));
+        } else if (tok.type == .char_literal) {
+            const val = self.parseCharLiteral(tok.text);
+            return @as(u16, val);
         } else if (tok.type == .identifier) {
             // Check constants first
             if (self.constants.get(tok.text)) |val| {
@@ -604,6 +619,10 @@ pub const Assembler = struct {
             .{ "RET", .RET },
             .{ "PUSHF", .PUSHF },
             .{ "POPF", .POPF },
+            .{ "PUTC", .PUTC },
+            .{ "PUTS", .PUTS },
+            .{ "PUTI", .PUTI },
+            .{ "PUTX", .PUTX },
             .{ "MOV", .MOV },
             .{ "MOVI", .MOVI },
             .{ "LOAD", .LOAD },

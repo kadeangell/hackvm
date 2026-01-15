@@ -92,3 +92,30 @@ export fn getRegister(index: u8) u16 {
 export fn getFlags() u8 {
     return cpu.flags.toU8();
 }
+
+// ============ Console I/O ============
+
+/// Get pointer to console buffer
+export fn getConsoleBufferPtr() [*]const u8 {
+    return @ptrCast(&cpu.console_buffer);
+}
+
+/// Get console buffer write position (for circular buffer handling)
+export fn getConsoleWritePos() u16 {
+    return cpu.console_write_pos;
+}
+
+/// Get console buffer length (valid bytes)
+export fn getConsoleLength() u16 {
+    return cpu.console_length;
+}
+
+/// Check if console has new output and clear the flag
+export fn consumeConsoleUpdate() bool {
+    return cpu.consumeConsoleUpdate();
+}
+
+/// Clear console buffer
+export fn clearConsole() void {
+    cpu.clearConsole();
+}

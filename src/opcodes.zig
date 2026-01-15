@@ -10,6 +10,10 @@ pub const Opcode = enum(u8) {
     RET = 0x03,
     PUSHF = 0x04,
     POPF = 0x05,
+    PUTC = 0x06,
+    PUTS = 0x07,
+    PUTI = 0x08,
+    PUTX = 0x09,
 
     // Data Movement (0x10-0x1F)
     MOV = 0x10,
@@ -92,6 +96,10 @@ pub const cycle_costs = blk: {
     costs[@intFromEnum(Opcode.RET)] = 5;
     costs[@intFromEnum(Opcode.PUSHF)] = 3;
     costs[@intFromEnum(Opcode.POPF)] = 3;
+    costs[@intFromEnum(Opcode.PUTC)] = 2;
+    costs[@intFromEnum(Opcode.PUTS)] = 3; // Base cost, actual = 3 + N
+    costs[@intFromEnum(Opcode.PUTI)] = 8;
+    costs[@intFromEnum(Opcode.PUTX)] = 6;
 
     // Data Movement
     costs[@intFromEnum(Opcode.MOV)] = 2;
@@ -176,6 +184,12 @@ pub const instruction_sizes = blk: {
     sizes[@intFromEnum(Opcode.POPF)] = 1;
     sizes[@intFromEnum(Opcode.MEMCPY)] = 1;
     sizes[@intFromEnum(Opcode.MEMSET)] = 1;
+
+    // Console I/O (2 bytes: opcode + register)
+    sizes[@intFromEnum(Opcode.PUTC)] = 2;
+    sizes[@intFromEnum(Opcode.PUTS)] = 2;
+    sizes[@intFromEnum(Opcode.PUTI)] = 2;
+    sizes[@intFromEnum(Opcode.PUTX)] = 2;
 
     // 2-byte instructions (register operands)
     sizes[@intFromEnum(Opcode.MOV)] = 2;

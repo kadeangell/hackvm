@@ -36,6 +36,11 @@ pub fn build(b: *std.Build) void {
         "getSP",
         "getRegister",
         "getFlags",
+        "getConsoleBufferPtr",
+        "getConsoleWritePos",
+        "getConsoleLength",
+        "consumeConsoleUpdate",
+        "clearConsole",
     };
 
     const install_emu_wasm = b.addInstallArtifact(emu_wasm, .{
@@ -157,4 +162,14 @@ pub fn build(b: *std.Build) void {
         }),
     });
     test_step.dependOn(&b.addRunArtifact(asm_tests).step);
+
+    // Console I/O integration tests
+    const console_integration_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/console_integration_test.zig"),
+            .target = native_target,
+            .optimize = optimize,
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(console_integration_tests).step);
 }
