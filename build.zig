@@ -41,6 +41,10 @@ pub fn build(b: *std.Build) void {
         "getConsoleLength",
         "consumeConsoleUpdate",
         "clearConsole",
+        "pushConsoleInput",
+        "isWaitingForInput",
+        "getInputMode",
+        "clearInput",
     };
 
     const install_emu_wasm = b.addInstallArtifact(emu_wasm, .{
